@@ -578,152 +578,259 @@ export default function ARWorldViewer({
       <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-[9999]">
         <Button
           onClick={cameraActive ? stopCamera : startCamera}
-          className="gap-2 bg-primary hover:bg-primary/90 shadow-lg text-white font-medium px-6 py-3 min-w-[140px]">
+          className="gap-2 bg-primary hover:bg-primary/90 shadow-lg text-white font-medium px-6 py-3 min-w-[140px] text-sm sm:text-base">
           {cameraActive ? (
             <>
-              <X className="h-5 w-5" />
+              <X className="h-4 w-4 sm:h-5 sm:w-5" />
               Stop AR
             </>
           ) : (
             <>
-              <Globe className="h-5 w-5" />
+              <Globe className="h-4 w-4 sm:h-5 sm:w-5" />
               Start AR Experience
             </>
           )}
         </Button>
       </div>
 
-      {/* Control Buttons Row - Always Accessible */}
-      <div className="fixed bottom-20 left-4 right-4 z-[9998] flex justify-between items-center">
-        {/* Left Side - Camera Controls */}
-        <div className="flex gap-2">
-          <Button
-            onClick={cameraActive ? stopCamera : startCamera}
-            variant="secondary"
-            className="gap-2 bg-white/90 text-black hover:bg-white shadow-lg min-w-[80px]">
-            {cameraActive ? (
-              <>
-                <X className="h-4 w-4" />
-                Stop
-              </>
-            ) : (
-              <>
-                <Camera className="h-4 w-4" />
-                Start
-              </>
-            )}
-          </Button>
+      {/* Control Buttons Row - Responsive and Always Accessible */}
+      <div className="fixed bottom-16 sm:bottom-20 left-2 right-2 sm:left-4 sm:right-4 z-[9998]">
+        {/* Mobile: Stack buttons vertically for small screens */}
+        <div className="block sm:hidden">
+          <div className="flex flex-col gap-2 items-center">
+            {/* Row 1: Camera Controls */}
+            <div className="flex gap-2 justify-center">
+              <Button
+                onClick={cameraActive ? stopCamera : startCamera}
+                variant="secondary"
+                size="sm"
+                className="gap-1 bg-white/90 text-black hover:bg-white shadow-lg min-w-[70px] text-xs">
+                {cameraActive ? (
+                  <>
+                    <X className="h-3 w-3" />
+                    Stop
+                  </>
+                ) : (
+                  <>
+                    <Camera className="h-3 w-3" />
+                    Start
+                  </>
+                )}
+              </Button>
 
-          {/* Retry Camera Button */}
-          <Button
-            onClick={() => {
-              console.log('Retrying camera...');
-              startCamera();
-            }}
-            variant="outline"
-            size="sm"
-            className="gap-2 bg-orange-500/90 text-white hover:bg-orange-600 min-w-[80px]">
-            <RefreshCw className="h-4 w-4" />
-            Retry
-          </Button>
-
-          {/* Request Permission Button */}
-          <Button
-            onClick={() => {
-              console.log('Requesting camera permission...');
-              navigator.mediaDevices
-                ?.getUserMedia({ video: true })
-                .then(stream => {
-                  console.log('Permission granted, stopping test stream');
-                  stream.getTracks().forEach(track => track.stop());
+              <Button
+                onClick={() => {
+                  console.log('Retrying camera...');
                   startCamera();
-                })
-                .catch(err => {
-                  console.error('Permission request failed:', err);
-                });
-            }}
-            variant="outline"
-            size="sm"
-            className="gap-2 bg-green-500/90 text-white hover:bg-green-600 min-w-[80px]">
-            <Camera className="h-4 w-4" />
-            Permission
-          </Button>
+                }}
+                variant="outline"
+                size="sm"
+                className="gap-1 bg-orange-500/90 text-white hover:bg-orange-600 min-w-[70px] text-xs">
+                <RefreshCw className="h-3 w-3" />
+                Retry
+              </Button>
 
-          {/* Debug Video Ref Button */}
-          <Button
-            onClick={() => {
-              console.log('Video ref status:', {
-                exists: !!videoRef.current,
-                element: videoRef.current,
-                tagName: videoRef.current?.tagName,
-                readyState: videoRef.current?.readyState
-              });
-              console.log('3D Scene status:', {
-                placedModels: placedModels,
-                modelUrl: modelUrl,
-                cameraActive: cameraActive,
-                cameraStream: !!cameraStream
-              });
-            }}
-            variant="outline"
-            size="sm"
-            className="gap-2 bg-yellow-500/90 text-white hover:bg-yellow-600 min-w-[80px]">
-            <Info className="h-4 w-4" />
-            Debug
-          </Button>
+              <Button
+                onClick={() => {
+                  console.log('Requesting camera permission...');
+                  navigator.mediaDevices
+                    ?.getUserMedia({ video: true })
+                    .then(stream => {
+                      console.log('Permission granted, stopping test stream');
+                      stream.getTracks().forEach(track => track.stop());
+                      startCamera();
+                    })
+                    .catch(err => {
+                      console.error('Permission request failed:', err);
+                    });
+                }}
+                variant="outline"
+                size="sm"
+                className="gap-1 bg-green-500/90 text-white hover:bg-green-600 min-w-[70px] text-xs">
+                <Camera className="h-3 w-3" />
+                Permission
+              </Button>
+            </div>
+
+            {/* Row 2: Model Controls */}
+            <div className="flex gap-2 justify-center">
+              <Button
+                onClick={() => {
+                  const testModel = {
+                    id: Date.now().toString(),
+                    position: [0, 0, -1] as [number, number, number],
+                    rotation: [0, 0, 0] as [number, number, number]
+                  };
+                  setPlacedModels(prev => [...prev, testModel]);
+                  console.log('Test model added at center');
+                }}
+                variant="outline"
+                size="sm"
+                className="gap-1 bg-blue-500/90 text-white hover:bg-blue-600 min-w-[70px] text-xs">
+                <Target className="h-3 w-3" />
+                Test
+              </Button>
+
+              <Button
+                onClick={() => {
+                  console.log('Video ref status:', {
+                    exists: !!videoRef.current,
+                    element: videoRef.current,
+                    tagName: videoRef.current?.tagName,
+                    readyState: videoRef.current?.readyState
+                  });
+                  console.log('3D Scene status:', {
+                    placedModels: placedModels,
+                    modelUrl: modelUrl,
+                    cameraActive: cameraActive,
+                    cameraStream: !!cameraStream
+                  });
+                }}
+                variant="outline"
+                size="sm"
+                className="gap-1 bg-yellow-500/90 text-white hover:bg-yellow-600 min-w-[70px] text-xs">
+                <Info className="h-3 w-3" />
+                Debug
+              </Button>
+
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={resetModels}
+                className="rounded-full bg-background/80 backdrop-blur-sm min-w-[40px] h-[40px] p-0">
+                <RotateCcw className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
         </div>
 
-        {/* Right Side - Model Controls */}
-        <div className="flex gap-2">
-          {/* Test Model Button */}
-          <Button
-            onClick={() => {
-              const testModel = {
-                id: Date.now().toString(),
-                position: [0, 0, -1] as [number, number, number],
-                rotation: [0, 0, 0] as [number, number, number]
-              };
-              setPlacedModels(prev => [...prev, testModel]);
-              console.log('Test model added at center');
-            }}
-            variant="outline"
-            className="gap-2 bg-blue-500/90 text-white hover:bg-blue-600 min-w-[80px]">
-            <Target className="h-4 w-4" />
-            Test
-          </Button>
+        {/* Desktop: Horizontal layout for larger screens */}
+        <div className="hidden sm:flex justify-between items-center">
+          {/* Left Side - Camera Controls */}
+          <div className="flex gap-2">
+            <Button
+              onClick={cameraActive ? stopCamera : startCamera}
+              variant="secondary"
+              className="gap-2 bg-white/90 text-black hover:bg-white shadow-lg min-w-[80px]">
+              {cameraActive ? (
+                <>
+                  <X className="h-4 w-4" />
+                  Stop
+                </>
+              ) : (
+                <>
+                  <Camera className="h-4 w-4" />
+                  Start
+                </>
+              )}
+            </Button>
 
-          {/* Reset Models Button - Always Visible */}
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={resetModels}
-            className="rounded-full bg-background/80 backdrop-blur-sm min-w-[40px] h-[40px] p-0">
-            <RotateCcw className="h-4 w-4" />
-          </Button>
+            <Button
+              onClick={() => {
+                console.log('Retrying camera...');
+                startCamera();
+              }}
+              variant="outline"
+              size="sm"
+              className="gap-2 bg-orange-500/90 text-white hover:bg-orange-600 min-w-[80px]">
+              <RefreshCw className="h-4 w-4" />
+              Retry
+            </Button>
+
+            <Button
+              onClick={() => {
+                console.log('Requesting camera permission...');
+                navigator.mediaDevices
+                  ?.getUserMedia({ video: true })
+                  .then(stream => {
+                    console.log('Permission granted, stopping test stream');
+                    stream.getTracks().forEach(track => track.stop());
+                    startCamera();
+                  })
+                  .catch(err => {
+                    console.error('Permission request failed:', err);
+                  });
+              }}
+              variant="outline"
+              size="sm"
+              className="gap-2 bg-green-500/90 text-white hover:bg-green-600 min-w-[80px]">
+              <Camera className="h-4 w-4" />
+              Permission
+            </Button>
+
+            <Button
+              onClick={() => {
+                console.log('Video ref status:', {
+                  exists: !!videoRef.current,
+                  element: videoRef.current,
+                  tagName: videoRef.current?.tagName,
+                  readyState: videoRef.current?.readyState
+                });
+                console.log('3D Scene status:', {
+                  placedModels: placedModels,
+                  modelUrl: modelUrl,
+                  cameraActive: cameraActive,
+                  cameraStream: !!cameraStream
+                });
+              }}
+              variant="outline"
+              size="sm"
+              className="gap-2 bg-yellow-500/90 text-white hover:bg-yellow-600 min-w-[80px]">
+              <Info className="h-4 w-4" />
+              Debug
+            </Button>
+          </div>
+
+          {/* Right Side - Model Controls */}
+          <div className="flex gap-2">
+            <Button
+              onClick={() => {
+                const testModel = {
+                  id: Date.now().toString(),
+                  position: [0, 0, -1] as [number, number, number],
+                  rotation: [0, 0, 0] as [number, number, number]
+                };
+                setPlacedModels(prev => [...prev, testModel]);
+                console.log('Test model added at center');
+              }}
+              variant="outline"
+              className="gap-2 bg-blue-500/90 text-white hover:bg-blue-600 min-w-[80px]">
+              <Target className="h-4 w-4" />
+              Test
+            </Button>
+
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={resetModels}
+              className="rounded-full bg-background/80 backdrop-blur-sm min-w-[40px] h-[40px] p-0">
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* Info Button - Always Accessible */}
-      <div className="fixed top-4 right-4 z-[9997]">
+      <div className="fixed top-2 right-2 sm:top-4 sm:right-4 z-[9997]">
         <Button
           size="icon"
           variant="secondary"
           onClick={() => setShowInfo(!showInfo)}
-          className="rounded-full bg-background/80 backdrop-blur-sm shadow-lg">
-          <Info className="h-4 w-4" />
+          className="rounded-full bg-background/80 backdrop-blur-sm shadow-lg w-8 h-8 sm:w-10 sm:h-10">
+          <Info className="h-3 w-3 sm:h-4 sm:w-4" />
         </Button>
       </div>
 
       {/* Info Panel */}
       {showInfo && (
-        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-[9996]">
+        <div className="fixed top-16 sm:top-20 left-2 right-2 sm:left-1/2 sm:transform sm:-translate-x-1/2 z-[9996]">
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="glass p-4 rounded-xl shadow-lg max-w-xs bg-background/90 backdrop-blur-sm border">
-            <h3 className="font-bold mb-2">{siteName}</h3>
-            <p className="text-sm text-muted-foreground mb-3">
+            className="glass p-3 sm:p-4 rounded-xl shadow-lg max-w-xs mx-auto bg-background/90 backdrop-blur-sm border">
+            <h3 className="font-bold mb-2 text-sm sm:text-base">{siteName}</h3>
+            <p className="text-xs sm:text-sm text-muted-foreground mb-3">
               Tap anywhere on the screen to place the 3D model in your
               environment.
             </p>
@@ -731,7 +838,8 @@ export default function ARWorldViewer({
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => setShowInfo(false)}>
+                onClick={() => setShowInfo(false)}
+                className="text-xs sm:text-sm">
                 Got it
               </Button>
             </div>
@@ -741,11 +849,11 @@ export default function ARWorldViewer({
 
       {/* Placed Models List - Always Accessible */}
       {placedModels.length > 0 && (
-        <div className="fixed top-20 right-4 z-[9995] bg-background/90 backdrop-blur-sm rounded-lg p-3 shadow-lg border max-w-[200px]">
-          <h4 className="text-sm font-medium mb-2">
+        <div className="fixed top-16 sm:top-20 right-2 sm:right-4 z-[9995] bg-background/90 backdrop-blur-sm rounded-lg p-2 sm:p-3 shadow-lg border max-w-[180px] sm:max-w-[200px]">
+          <h4 className="text-xs sm:text-sm font-medium mb-2">
             Placed Models ({placedModels.length})
           </h4>
-          <div className="space-y-2 max-h-[200px] overflow-y-auto">
+          <div className="space-y-1 sm:space-y-2 max-h-[150px] sm:max-h-[200px] overflow-y-auto">
             {placedModels.map((model, index) => (
               <div key={model.id} className="flex items-center gap-2 text-xs">
                 <span className="flex-1">Model {index + 1}</span>
@@ -753,8 +861,8 @@ export default function ARWorldViewer({
                   size="sm"
                   variant="ghost"
                   onClick={() => removeModel(model.id)}
-                  className="h-6 w-6 p-0 hover:bg-red-100">
-                  <X className="h-3 w-3" />
+                  className="h-5 w-5 sm:h-6 sm:w-6 p-0 hover:bg-red-100">
+                  <X className="h-2 w-2 sm:h-3 sm:w-3" />
                 </Button>
               </div>
             ))}
