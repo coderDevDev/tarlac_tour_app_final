@@ -165,10 +165,17 @@ export default function ARWorldViewer({
 
   // Debug info
   useEffect(() => {
+    console.log('AR World Viewer State:', {
+      arSupported,
+      cameraActive,
+      placedModelsCount: placedModels.length,
+      showInfo
+    });
+    
     if (cameraActive) {
       console.log('Camera active, models count:', placedModels.length);
     }
-  }, [cameraActive, placedModels.length]);
+  }, [arSupported, cameraActive, placedModels.length, showInfo]);
 
   // Cleanup camera on unmount
   useEffect(() => {
@@ -201,8 +208,15 @@ export default function ARWorldViewer({
     );
   }
 
+  // Debug: Always show camera mode for testing
+  console.log('AR Support Check:', { arSupported, navigator: !!navigator.xr });
+
   return (
     <div className="relative w-full h-full" ref={containerRef}>
+      {/* Debug Status Bar */}
+      <div className="absolute top-0 left-0 right-0 z-50 bg-black/50 text-white text-xs p-2 text-center">
+        AR Supported: {arSupported ? 'Yes' : 'No'} | Camera: {cameraActive ? 'Active' : 'Inactive'} | Models: {placedModels.length}
+      </div>
       {/* Camera Feed with 3D Overlay */}
       {cameraActive ? (
         <div className="w-full h-full relative">
@@ -288,24 +302,42 @@ export default function ARWorldViewer({
       )}
 
       {/* AR Experience Button - Bottom Center */}
-      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10">
-        <div className="bg-background/20 backdrop-blur-sm rounded-full p-1">
-          <Button
-            onClick={cameraActive ? stopCamera : startCamera}
-            className="gap-2 bg-primary hover:bg-primary/90 shadow-lg">
-            {cameraActive ? (
-              <>
-                <X className="h-4 w-4" />
-                Stop AR
-              </>
-            ) : (
-              <>
-                <Globe className="h-4 w-4" />
-                Start AR Experience
-              </>
-            )}
-          </Button>
-        </div>
+      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50">
+        <Button
+          onClick={cameraActive ? stopCamera : startCamera}
+          className="gap-2 bg-primary hover:bg-primary/90 shadow-lg text-white font-medium px-6 py-3">
+          {cameraActive ? (
+            <>
+              <X className="h-5 w-5" />
+              Stop AR
+            </>
+          ) : (
+            <>
+              <Globe className="h-5 w-5" />
+              Start AR Experience
+            </>
+          )}
+        </Button>
+      </div>
+
+      {/* Fallback Button - Always Visible */}
+      <div className="absolute bottom-20 left-4 z-50">
+        <Button
+          onClick={cameraActive ? stopCamera : startCamera}
+          variant="secondary"
+          className="gap-2 bg-white/90 text-black hover:bg-white shadow-lg">
+          {cameraActive ? (
+            <>
+              <X className="h-4 w-4" />
+              Stop
+            </>
+          ) : (
+            <>
+              <Camera className="h-4 w-4" />
+              Start
+            </>
+          )}
+        </Button>
       </div>
 
       {/* Control Buttons */}
