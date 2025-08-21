@@ -69,7 +69,7 @@ export default function ARWorldViewer({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Check AR support
+  // Check AR support and camera permissions
   useEffect(() => {
     // Check for WebXR support
     if (navigator.xr) {
@@ -83,6 +83,21 @@ export default function ARWorldViewer({
         });
     } else {
       setArSupported(false);
+    }
+
+    // Check camera permissions on mobile
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions
+        .query({ name: 'camera' as PermissionName })
+        .then(permissionStatus => {
+          console.log('Camera permission status:', permissionStatus.state);
+          if (permissionStatus.state === 'denied') {
+            console.warn('Camera permission denied');
+          }
+        })
+        .catch(err => {
+          console.log('Permission query not supported:', err);
+        });
     }
   }, []);
 
@@ -110,32 +125,87 @@ export default function ARWorldViewer({
     try {
       console.log('Starting camera...');
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({
+        // Mobile-optimized camera settings
+        const constraints = {
           video: {
             facingMode: 'environment',
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          }
-        });
+            width: { ideal: 1280, max: 1920 },
+            height: { ideal: 720, max: 1080 },
+            aspectRatio: { ideal: 16 / 9 }
+          },
+          audio: false
+        };
+
+        console.log('Requesting camera with constraints:', constraints);
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
 
         console.log('Camera stream obtained:', stream);
         setCameraStream(stream);
         setCameraActive(true);
 
-        // Set up video element
+        // Set up video element with mobile-specific handling
         if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.onloadedmetadata = () => {
-            console.log('Video metadata loaded, playing video...');
-            videoRef.current
-              ?.play()
-              .then(() => {
-                console.log('Video playing successfully');
-              })
-              .catch(err => {
-                console.error('Error playing video:', err);
-              });
+          const video = videoRef.current;
+
+          // Mobile-specific video attributes
+          video.setAttribute('playsinline', 'true');
+          video.setAttribute('webkit-playsinline', 'true');
+          video.setAttribute('muted', 'true');
+          video.setAttribute('autoplay', 'true');
+
+          video.srcObject = stream;
+
+          // Handle video loading and playing
+          const playVideo = async () => {
+            try {
+              console.log('Attempting to play video...');
+              await video.play();
+              console.log('Video playing successfully');
+            } catch (playError) {
+              console.error('Play error:', playError);
+              // Try again after a short delay (mobile workaround)
+              setTimeout(async () => {
+                try {
+                  await video.play();
+                  console.log('Video playing after retry');
+                } catch (retryError) {
+                  console.error('Retry failed:', retryError);
+                }
+              }, 100);
+            }
           };
+
+          // Multiple event handlers for mobile compatibility
+          video.onloadedmetadata = () => {
+            console.log(
+              'Video metadata loaded, dimensions:',
+              video.videoWidth,
+              'x',
+              video.videoHeight
+            );
+            playVideo();
+          };
+
+          video.oncanplay = () => {
+            console.log('Video can play, attempting to play...');
+            playVideo();
+          };
+
+          video.onloadeddata = () => {
+            console.log('Video data loaded');
+            playVideo();
+          };
+
+          // Force play on user interaction (mobile requirement)
+          const forcePlay = () => {
+            if (video.paused) {
+              playVideo();
+            }
+          };
+
+          // Add click listener to force play
+          video.addEventListener('click', forcePlay);
+          video.addEventListener('touchstart', forcePlay);
         } else {
           console.error('Video ref not found');
         }
@@ -261,6 +331,11 @@ export default function ARWorldViewer({
             playsInline
             muted
             autoPlay
+            webkit-playsinline="true"
+            style={{
+              transform: 'scaleX(-1)', // Mirror the camera for better UX
+              objectFit: 'cover'
+            }}
           />
 
           {/* Fallback if camera fails */}
@@ -269,7 +344,31 @@ export default function ARWorldViewer({
               <div className="text-center text-white">
                 <Camera className="h-16 w-16 mx-auto mb-4 opacity-50" />
                 <p className="text-lg font-medium mb-2">Camera Loading...</p>
-                <p className="text-sm opacity-75">3D models will appear here</p>
+                <p className="text-sm opacity-75 mb-4">
+                  3D models will appear here
+                </p>
+
+                {/* Mobile troubleshooting tips */}
+                <div className="bg-white/20 rounded-lg p-3 max-w-xs">
+                  <p className="text-xs font-medium mb-2">Mobile Tips:</p>
+                  <ul className="text-xs space-y-1 text-left">
+                    <li>• Allow camera permissions when prompted</li>
+                    <li>• Tap the screen to activate camera</li>
+                    <li>• Ensure you're using HTTPS</li>
+                    <li>• Try refreshing the page</li>
+                  </ul>
+
+                  <Button
+                    onClick={() => {
+                      console.log('Retrying camera...');
+                      startCamera();
+                    }}
+                    className="mt-3 w-full bg-white/20 hover:bg-white/30 text-white border-white/30"
+                    size="sm">
+                    <RefreshCw className="h-3 w-3 mr-1" />
+                    Retry Camera
+                  </Button>
+                </div>
               </div>
             </div>
           )}
@@ -306,6 +405,21 @@ export default function ARWorldViewer({
               placed
             </div>
           )}
+
+          {/* Camera Status Indicator */}
+          <div className="absolute top-4 left-4 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
+            {cameraStream ? (
+              <span className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                Camera Active
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                Camera Loading...
+              </span>
+            )}
+          </div>
 
           {/* AR Crosshair */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
