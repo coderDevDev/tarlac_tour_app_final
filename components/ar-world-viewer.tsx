@@ -301,10 +301,10 @@ export default function ARWorldViewer({
     const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
-    // Place model at calculated position - make it more visible
+    // Place model at calculated position - make it more visible and centered
     const newModel = {
       id: Date.now().toString(),
-      position: [x * 1.5, -y * 1.5, -1] as [number, number, number], // Much closer for visibility
+      position: [x * 2, -y * 2, -2] as [number, number, number], // Further back but more spread out
       rotation: [0, 0, 0] as [number, number, number]
     };
 
@@ -436,7 +436,7 @@ export default function ARWorldViewer({
           )}
 
           {/* 3D Models Overlay */}
-          <div className="absolute inset-0 pointer-events-none z-20">
+          <div className="absolute inset-0 pointer-events-none z-30">
             <Canvas
               style={{ width: '100%', height: '100%' }}
               camera={{ position: [0, 0, 5], fov: 75 }}
@@ -446,8 +446,9 @@ export default function ARWorldViewer({
                 preserveDrawingBuffer: true
               }}>
               <PerspectiveCamera makeDefault position={[0, 0, 5]} fov={75} />
-              <ambientLight intensity={1.0} />
-              <directionalLight position={[10, 10, 5]} intensity={2.0} />
+              <ambientLight intensity={1.5} />
+              <directionalLight position={[10, 10, 5]} intensity={2.5} />
+              <pointLight position={[0, 5, 5]} intensity={1.0} />
 
               {/* Placed Models */}
               {placedModels.map(model => (
@@ -457,6 +458,9 @@ export default function ARWorldViewer({
                   position={model.position}
                 />
               ))}
+
+              {/* Debug Grid to help visualize 3D space */}
+              <gridHelper args={[10, 10, 0x444444, 0x888888]} />
             </Canvas>
           </div>
 
@@ -515,6 +519,25 @@ export default function ARWorldViewer({
               <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 border border-white/30 rounded-full"></div>
             </div>
           </div>
+
+          {/* Model Placement Indicator */}
+          {placedModels.length > 0 && (
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+              <div className="text-center">
+                <div className="w-32 h-32 border-2 border-green-400/50 rounded-lg relative">
+                  <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-green-400"></div>
+                  <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-green-400"></div>
+                  <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-green-400"></div>
+                  <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-green-400"></div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-green-400 text-xs font-medium">
+                      3D Models Area
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Placement Instructions */}
           <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2 text-center">
@@ -634,6 +657,12 @@ export default function ARWorldViewer({
                 element: videoRef.current,
                 tagName: videoRef.current?.tagName,
                 readyState: videoRef.current?.readyState
+              });
+              console.log('3D Scene status:', {
+                placedModels: placedModels,
+                modelUrl: modelUrl,
+                cameraActive: cameraActive,
+                cameraStream: !!cameraStream
               });
             }}
             variant="outline"
