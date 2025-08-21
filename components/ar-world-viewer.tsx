@@ -11,7 +11,15 @@ import {
 } from '@react-three/drei';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Info, RotateCcw, X, Camera, Globe, Target } from 'lucide-react';
+import {
+  Info,
+  RotateCcw,
+  X,
+  Camera,
+  Globe,
+  Target,
+  RefreshCw
+} from 'lucide-react';
 import * as THREE from 'three';
 
 interface ModelProps {
@@ -124,6 +132,21 @@ export default function ARWorldViewer({
   const startCamera = async () => {
     try {
       console.log('Starting camera...');
+
+      // Check if video ref exists before proceeding
+      if (!videoRef.current) {
+        console.error(
+          'Video ref not found - waiting for ref to be available...'
+        );
+        // Wait a bit for the ref to be set
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        if (!videoRef.current) {
+          console.error('Video ref still not available after delay');
+          throw new Error('Video element not found');
+        }
+      }
+
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         // Mobile-optimized camera settings
         const constraints = {
@@ -285,6 +308,15 @@ export default function ARWorldViewer({
     return () => {
       stopCamera();
     };
+  }, []);
+
+  // Ensure video ref is available
+  useEffect(() => {
+    if (videoRef.current) {
+      console.log('Video ref initialized:', videoRef.current);
+    } else {
+      console.log('Video ref not yet available');
+    }
   }, []);
 
   if (!arSupported) {
@@ -519,6 +551,25 @@ export default function ARWorldViewer({
           className="gap-2 bg-blue-500/90 text-white hover:bg-blue-600">
           <Target className="h-4 w-4" />
           Test Model
+        </Button>
+      </div>
+
+      {/* Debug Video Ref Button */}
+      <div className="absolute bottom-32 left-4 z-50">
+        <Button
+          onClick={() => {
+            console.log('Video ref status:', {
+              exists: !!videoRef.current,
+              element: videoRef.current,
+              tagName: videoRef.current?.tagName,
+              readyState: videoRef.current?.readyState
+            });
+          }}
+          variant="outline"
+          size="sm"
+          className="gap-2 bg-yellow-500/90 text-white hover:bg-yellow-600">
+          <Info className="h-4 w-4" />
+          Debug Video
         </Button>
       </div>
 
