@@ -677,12 +677,12 @@ export default function ARWorldViewer({
 
       {/* Info Panel */}
       {showInfo && (
-        <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-20">
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-[9996]">
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="glass p-4 rounded-xl shadow-lg max-w-xs bg-background/90 backdrop-blur-sm">
+            className="glass p-4 rounded-xl shadow-lg max-w-xs bg-background/90 backdrop-blur-sm border">
             <h3 className="font-bold mb-2">{siteName}</h3>
             <p className="text-sm text-muted-foreground mb-3">
               Tap anywhere on the screen to place the 3D model in your
@@ -700,19 +700,21 @@ export default function ARWorldViewer({
         </div>
       )}
 
-      {/* Placed Models List */}
-      {cameraActive && placedModels.length > 0 && (
-        <div className="absolute top-20 right-4 bg-background/90 backdrop-blur-sm rounded-lg p-3 shadow-lg">
-          <h4 className="text-sm font-medium mb-2">Placed Models</h4>
-          <div className="space-y-2">
+      {/* Placed Models List - Always Accessible */}
+      {placedModels.length > 0 && (
+        <div className="fixed top-20 right-4 z-[9995] bg-background/90 backdrop-blur-sm rounded-lg p-3 shadow-lg border max-w-[200px]">
+          <h4 className="text-sm font-medium mb-2">
+            Placed Models ({placedModels.length})
+          </h4>
+          <div className="space-y-2 max-h-[200px] overflow-y-auto">
             {placedModels.map((model, index) => (
               <div key={model.id} className="flex items-center gap-2 text-xs">
-                <span>Model {index + 1}</span>
+                <span className="flex-1">Model {index + 1}</span>
                 <Button
                   size="sm"
                   variant="ghost"
                   onClick={() => removeModel(model.id)}
-                  className="h-6 w-6 p-0">
+                  className="h-6 w-6 p-0 hover:bg-red-100">
                   <X className="h-3 w-3" />
                 </Button>
               </div>
