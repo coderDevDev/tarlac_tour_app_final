@@ -108,6 +108,7 @@ export default function ARWorldViewer({
 
   const startCamera = async () => {
     try {
+      console.log('Starting camera...');
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
@@ -117,19 +118,36 @@ export default function ARWorldViewer({
           }
         });
 
+        console.log('Camera stream obtained:', stream);
         setCameraStream(stream);
         setCameraActive(true);
 
         // Set up video element
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          videoRef.current.play();
+          videoRef.current.onloadedmetadata = () => {
+            console.log('Video metadata loaded, playing video...');
+            videoRef.current
+              ?.play()
+              .then(() => {
+                console.log('Video playing successfully');
+              })
+              .catch(err => {
+                console.error('Error playing video:', err);
+              });
+          };
+        } else {
+          console.error('Video ref not found');
         }
 
         return stream;
+      } else {
+        console.error('getUserMedia not supported');
       }
     } catch (error) {
       console.error('Camera access failed:', error);
+      // Fallback: still show the interface even if camera fails
+      setCameraActive(true);
     }
   };
 
@@ -152,7 +170,7 @@ export default function ARWorldViewer({
     // Place model at calculated position - make it more visible
     const newModel = {
       id: Date.now().toString(),
-      position: [x * 1.5, -y * 1.5, -2] as [number, number, number], // Closer and more visible
+      position: [x * 1.5, -y * 1.5, -1] as [number, number, number], // Much closer for visibility
       rotation: [0, 0, 0] as [number, number, number]
     };
 
@@ -161,6 +179,21 @@ export default function ARWorldViewer({
       y: event.clientY
     });
     setPlacedModels(prev => [...prev, newModel]);
+
+    // Visual feedback
+    const feedback = document.createElement('div');
+    feedback.className =
+      'absolute w-4 h-4 bg-green-500 rounded-full pointer-events-none animate-ping';
+    feedback.style.left = `${event.clientX - 8}px`;
+    feedback.style.top = `${event.clientY - 8}px`;
+    feedback.style.zIndex = '1000';
+    document.body.appendChild(feedback);
+
+    setTimeout(() => {
+      if (document.body.contains(feedback)) {
+        document.body.removeChild(feedback);
+      }
+    }, 1000);
   };
 
   // Debug info
@@ -230,15 +263,30 @@ export default function ARWorldViewer({
             autoPlay
           />
 
+          {/* Fallback if camera fails */}
+          {!cameraStream && (
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+              <div className="text-center text-white">
+                <Camera className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                <p className="text-lg font-medium mb-2">Camera Loading...</p>
+                <p className="text-sm opacity-75">3D models will appear here</p>
+              </div>
+            </div>
+          )}
+
           {/* 3D Models Overlay */}
-          <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute inset-0 pointer-events-none z-20">
             <Canvas
               style={{ width: '100%', height: '100%' }}
               camera={{ position: [0, 0, 5], fov: 75 }}
-              gl={{ alpha: true, antialias: true }}>
+              gl={{
+                alpha: true,
+                antialias: true,
+                preserveDrawingBuffer: true
+              }}>
               <PerspectiveCamera makeDefault position={[0, 0, 5]} fov={75} />
-              <ambientLight intensity={0.8} />
-              <directionalLight position={[10, 10, 5]} intensity={1.5} />
+              <ambientLight intensity={1.0} />
+              <directionalLight position={[10, 10, 5]} intensity={2.0} />
 
               {/* Placed Models */}
               {placedModels.map(model => (
@@ -338,6 +386,25 @@ export default function ARWorldViewer({
               Start
             </>
           )}
+        </Button>
+      </div>
+
+      {/* Test Model Button */}
+      <div className="absolute bottom-20 right-4 z-50">
+        <Button
+          onClick={() => {
+            const testModel = {
+              id: Date.now().toString(),
+              position: [0, 0, -1] as [number, number, number],
+              rotation: [0, 0, 0] as [number, number, number]
+            };
+            setPlacedModels(prev => [...prev, testModel]);
+            console.log('Test model added at center');
+          }}
+          variant="outline"
+          className="gap-2 bg-blue-500/90 text-white hover:bg-blue-600">
+          <Target className="h-4 w-4" />
+          Test Model
         </Button>
       </div>
 
