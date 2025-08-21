@@ -413,7 +413,7 @@ export default function ARWorldViewer({
 
           {/* Fallback if camera fails */}
           {!cameraStream && (
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center z-10">
               <div className="text-center text-white">
                 <Camera className="h-16 w-16 mx-auto mb-4 opacity-50" />
                 <p className="text-lg font-medium mb-2">Camera Loading...</p>
@@ -430,41 +430,6 @@ export default function ARWorldViewer({
                     <li>• Ensure you're using HTTPS</li>
                     <li>• Try refreshing the page</li>
                   </ul>
-
-                  <div className="flex gap-2 mt-3">
-                    <Button
-                      onClick={() => {
-                        console.log('Retrying camera...');
-                        startCamera();
-                      }}
-                      className="flex-1 bg-white/20 hover:bg-white/30 text-white border-white/30"
-                      size="sm">
-                      <RefreshCw className="h-3 w-3 mr-1" />
-                      Retry
-                    </Button>
-
-                    <Button
-                      onClick={() => {
-                        console.log('Requesting camera permission...');
-                        navigator.mediaDevices
-                          ?.getUserMedia({ video: true })
-                          .then(stream => {
-                            console.log(
-                              'Permission granted, stopping test stream'
-                            );
-                            stream.getTracks().forEach(track => track.stop());
-                            startCamera();
-                          })
-                          .catch(err => {
-                            console.error('Permission request failed:', err);
-                          });
-                      }}
-                      className="flex-1 bg-green-500/80 hover:bg-green-600/80 text-white"
-                      size="sm">
-                      <Camera className="h-3 w-3 mr-1" />
-                      Permission
-                    </Button>
-                  </div>
                 </div>
               </div>
             </div>
@@ -532,6 +497,16 @@ export default function ARWorldViewer({
               </span>
             )}
           </div>
+
+          {/* Camera Error Status */}
+          {!cameraStream && cameraActive && (
+            <div className="absolute top-4 right-4 bg-red-500/90 text-white px-3 py-1 rounded-full text-xs">
+              <span className="flex items-center gap-1">
+                <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                Camera Error
+              </span>
+            </div>
+          )}
 
           {/* AR Crosshair */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -614,6 +589,41 @@ export default function ARWorldViewer({
                 Start
               </>
             )}
+          </Button>
+
+          {/* Retry Camera Button */}
+          <Button
+            onClick={() => {
+              console.log('Retrying camera...');
+              startCamera();
+            }}
+            variant="outline"
+            size="sm"
+            className="gap-2 bg-orange-500/90 text-white hover:bg-orange-600 min-w-[80px]">
+            <RefreshCw className="h-4 w-4" />
+            Retry
+          </Button>
+
+          {/* Request Permission Button */}
+          <Button
+            onClick={() => {
+              console.log('Requesting camera permission...');
+              navigator.mediaDevices
+                ?.getUserMedia({ video: true })
+                .then(stream => {
+                  console.log('Permission granted, stopping test stream');
+                  stream.getTracks().forEach(track => track.stop());
+                  startCamera();
+                })
+                .catch(err => {
+                  console.error('Permission request failed:', err);
+                });
+            }}
+            variant="outline"
+            size="sm"
+            className="gap-2 bg-green-500/90 text-white hover:bg-green-600 min-w-[80px]">
+            <Camera className="h-4 w-4" />
+            Permission
           </Button>
 
           {/* Debug Video Ref Button */}
