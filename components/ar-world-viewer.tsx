@@ -171,7 +171,7 @@ export default function ARWorldViewer({
       placedModelsCount: placedModels.length,
       showInfo
     });
-    
+
     if (cameraActive) {
       console.log('Camera active, models count:', placedModels.length);
     }
@@ -215,7 +215,8 @@ export default function ARWorldViewer({
     <div className="relative w-full h-full" ref={containerRef}>
       {/* Debug Status Bar */}
       <div className="absolute top-0 left-0 right-0 z-50 bg-black/50 text-white text-xs p-2 text-center">
-        AR Supported: {arSupported ? 'Yes' : 'No'} | Camera: {cameraActive ? 'Active' : 'Inactive'} | Models: {placedModels.length}
+        AR Supported: {arSupported ? 'Yes' : 'No'} | Camera:{' '}
+        {cameraActive ? 'Active' : 'Inactive'} | Models: {placedModels.length}
       </div>
       {/* Camera Feed with 3D Overlay */}
       {cameraActive ? (
