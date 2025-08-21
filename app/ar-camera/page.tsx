@@ -1,7 +1,6 @@
 'use client';
 
-import type React from 'react';
-
+import { Suspense } from 'react';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Camera, X, Upload, RefreshCw, Globe } from 'lucide-react';
@@ -18,7 +17,7 @@ import ARViewer from '@/components/ar-viewer';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 
-export default function ARCameraPage() {
+function ARCameraContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const siteId = searchParams.get('siteId');
@@ -149,25 +148,12 @@ export default function ARCameraPage() {
       setCameraPermission('granted');
     } catch (err: any) {
       console.error('Error starting camera:', err);
-
-      if (
-        err.name === 'NotAllowedError' ||
-        err.name === 'PermissionDeniedError'
-      ) {
-        setCameraPermission('denied');
-        setError(
-          'Camera permission denied. Please allow camera access in your browser settings and try again.'
-        );
-      } else if (
-        err.name === 'NotFoundError' ||
-        err.name === 'DevicesNotFoundError'
-      ) {
-        setError('No camera found on this device.');
-      } else {
-        setError(`Error accessing camera: ${err.message || 'Unknown error'}`);
-      }
-
-      setCameraActive(false);
+      setError(
+        err.message === 'Permission denied'
+          ? 'Camera access was denied. Please allow camera access and try again.'
+          : `Failed to start camera: ${err.message}`
+      );
+      setCameraPermission('denied');
     } finally {
       setIsLoading(false);
     }
@@ -179,22 +165,53 @@ export default function ARCameraPage() {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
+    setCameraActive(false);
+    setScanning(false);
+  };
 
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
+  // Request camera permission
+  const requestCameraPermission = async () => {
+    setError(null);
+    setIsLoading(true);
 
-    // Clear any scanning intervals
-    if (window.qrScanInterval) {
-      clearInterval(window.qrScanInterval);
-      window.qrScanInterval = null;
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera not supported in this browser');
+      }
+
+      // Request camera access
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+        audio: false
+      });
+
+      // Stop the stream immediately after getting permission
+      stream.getTracks().forEach(track => track.stop());
+
+      setCameraPermission('granted');
+      setCameraActive(true);
+    } catch (err: any) {
+      console.error('Error requesting camera permission:', err);
+      setError(
+        err.message === 'Permission denied'
+          ? 'Camera access was denied. Please allow camera access and try again.'
+          : `Failed to get camera permission: ${err.message}`
+      );
+      setCameraPermission('denied');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Start scanning for QR codes
+  // Trigger file upload
+  const triggerFileUpload = () => {
+    fileInputRef.current?.click();
+  };
+
+  // Start QR scanning
   const startQrScanning = async () => {
     setScanning(true);
-    console.log('Starting QR code scanning');
+    setError(null);
 
     try {
       // Dynamically import jsQR
@@ -297,103 +314,47 @@ export default function ARCameraPage() {
 
       // Get image data for QR code processing
       const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+
+      // Detect QR code
       const code = jsQR(imageData.data, imageData.width, imageData.height, {
         inversionAttempts: 'dontInvert'
       });
 
       if (code) {
+        console.log('QR code detected from file:', code.data);
         processQrCode(code.data);
       } else {
-        setError('No QR code found in the image. Please try another image.');
+        setError('No QR code found in the uploaded image');
       }
-    } catch (err) {
-      console.error('Error processing image:', err);
-      setError(
-        'Failed to process the image. Please try another image or use the camera scanner.'
-      );
+    } catch (err: any) {
+      console.error('Error processing uploaded image:', err);
+      setError(`Failed to process image: ${err.message}`);
     } finally {
       setIsLoading(false);
+      // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     }
   };
 
-  // Process QR code data
-  const processQrCode = (data: string) => {
+  // Process QR code
+  const processQrCode = (qrData: string) => {
+    console.log('Processing QR code:', qrData);
+
+    // Try to parse the QR code data
     try {
-      // Extract the siteId from the QR code data
-      let extractedSiteId: string | null = null;
-
-      // Case 1: Full URL (e.g., https://example.com/ar-camera?siteId=site-id)
-      if (data.includes('/ar-camera?siteId=')) {
-        try {
-          const url = new URL(data);
-          extractedSiteId = url.searchParams.get('siteId');
-        } catch (e) {
-          // If it's not a valid URL, try to extract the siteId directly
-          const match = data.match(/\/ar-camera\?siteId=([^&]+)/);
-          if (match && match[1]) {
-            extractedSiteId = match[1];
-          }
-        }
-      }
-      // Case 2: Just the path (e.g., /ar-camera?siteId=site-id)
-      else if (data.startsWith('/ar-camera?siteId=')) {
-        const params = new URLSearchParams(data.split('?')[1]);
-        extractedSiteId = params.get('siteId');
-      }
-      // Case 3: Just the site ID
-      else if (validSiteIds.includes(data)) {
-        extractedSiteId = data;
-      }
-
-      if (extractedSiteId && validSiteIds.includes(extractedSiteId)) {
-        // Stop scanning and camera
-        setScanning(false);
-        setCameraActive(false);
-
-        // Navigate to the AR experience
-        router.push(`/ar-camera?siteId=${extractedSiteId}`);
+      // Check if it's a valid site ID
+      const siteId = qrData.trim();
+      if (validSiteIds.includes(siteId)) {
+        console.log('Valid site ID found, navigating to AR viewer');
+        router.push(`/ar-camera?siteId=${siteId}`);
       } else {
-        setError('Invalid QR code. Please scan a valid heritage site QR code.');
+        setError(`Invalid site ID: ${siteId}. Please scan a valid QR code.`);
       }
     } catch (err) {
       console.error('Error processing QR code:', err);
-      setError('Failed to process QR code. Please try again.');
-    }
-  };
-
-  // Trigger file upload
-  const triggerFileUpload = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
-  };
-
-  // Request camera permissions
-  const requestCameraPermission = async () => {
-    try {
-      console.log('Requesting camera permission...');
-
-      // Check if we already have permission
-      if (navigator.permissions && navigator.permissions.query) {
-        const result = await navigator.permissions.query({
-          name: 'camera' as PermissionName
-        });
-        console.log('Permission query result:', result.state);
-
-        if (result.state === 'granted') {
-          console.log('Camera permission already granted');
-          setCameraPermission('granted');
-        }
-      }
-
-      // Set camera active which will trigger the useEffect to start the camera
-      setCameraActive(true);
-    } catch (err) {
-      console.error('Error requesting camera permission:', err);
-      setError('Failed to request camera permission. Please try again.');
+      setError('Invalid QR code format. Please scan a valid QR code.');
     }
   };
 
@@ -610,11 +571,26 @@ export default function ARCameraPage() {
   );
 }
 
+export default function ARCameraPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex flex-col items-center justify-center h-screen p-6 text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mb-4"></div>
+          <p className="font-medium">Loading AR Camera...</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            Please wait while we prepare your camera experience
+          </p>
+        </div>
+      }>
+      <ARCameraContent />
+    </Suspense>
+  );
+}
+
 // Add the missing type to the global Window interface
 declare global {
   interface Window {
     qrScanInterval: NodeJS.Timeout | null;
   }
 }
-
-// Update the startQrScanning function to be more reliable:

@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getSiteById } from '@/lib/data';
 import ARWorldViewer from '@/components/ar-world-viewer';
@@ -7,7 +8,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
-export default function ARWorldPage() {
+function ARWorldContent() {
   const searchParams = useSearchParams();
   const siteId = searchParams.get('siteId');
   const site = siteId ? getSiteById(siteId) : null;
@@ -47,7 +48,27 @@ export default function ARWorldPage() {
       </div>
 
       {/* AR Viewer */}
-      <ARWorldViewer modelUrl={site.modelUrl} siteName={site.name} />
+      <ARWorldViewer
+        modelUrl={site.modelUrl || '/models/placeholder.glb'}
+        siteName={site.name}
+      />
     </div>
+  );
+}
+
+export default function ARWorldPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex flex-col items-center justify-center h-screen p-6 text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mb-4"></div>
+          <p className="font-medium">Loading AR World...</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            Please wait while we prepare your AR experience
+          </p>
+        </div>
+      }>
+      <ARWorldContent />
+    </Suspense>
   );
 }
