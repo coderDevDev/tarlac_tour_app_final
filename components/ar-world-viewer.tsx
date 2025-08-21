@@ -147,20 +147,43 @@ export default function ARWorldViewer({
         }
       }
 
+      // Check if we're on HTTPS (required for camera on mobile)
+      if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+        console.error('Camera requires HTTPS on mobile devices');
+        throw new Error(
+          'Camera requires HTTPS on mobile devices. Please use HTTPS or localhost.'
+        );
+      }
+
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        // Mobile-optimized camera settings
+        // Mobile-optimized camera settings with fallbacks
         const constraints = {
           video: {
-            facingMode: 'environment',
-            width: { ideal: 1280, max: 1920 },
-            height: { ideal: 720, max: 1080 },
-            aspectRatio: { ideal: 16 / 9 }
+            facingMode: { ideal: 'environment', fallback: 'user' },
+            width: { ideal: 1280, max: 1920, min: 640 },
+            height: { ideal: 720, max: 1080, min: 480 },
+            aspectRatio: { ideal: 16 / 9, max: 2, min: 0.5 }
           },
           audio: false
         };
 
         console.log('Requesting camera with constraints:', constraints);
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+        // Try to get camera stream with fallback
+        let stream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (constraintError) {
+          console.log(
+            'Primary constraints failed, trying fallback:',
+            constraintError
+          );
+          // Fallback to basic constraints
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' },
+            audio: false
+          });
+        }
 
         console.log('Camera stream obtained:', stream);
         setCameraStream(stream);
@@ -175,6 +198,12 @@ export default function ARWorldViewer({
           video.setAttribute('webkit-playsinline', 'true');
           video.setAttribute('muted', 'true');
           video.setAttribute('autoplay', 'true');
+          video.setAttribute('controls', 'false');
+
+          // Set video properties
+          video.playsInline = true;
+          video.muted = true;
+          video.autoplay = true;
 
           video.srcObject = stream;
 
@@ -219,16 +248,28 @@ export default function ARWorldViewer({
             playVideo();
           };
 
-          // Force play on user interaction (mobile requirement)
-          const forcePlay = () => {
-            if (video.paused) {
-              playVideo();
-            }
+          video.oncanplaythrough = () => {
+            console.log('Video can play through');
+            playVideo();
           };
 
-          // Add click listener to force play
+          // Force play on user interaction (mobile requirement)
+          const forcePlay = () => {
+            console.log('User interaction detected, forcing video play');
+            playVideo();
+          };
+
+          // Add multiple event listeners for mobile compatibility
           video.addEventListener('click', forcePlay);
           video.addEventListener('touchstart', forcePlay);
+          video.addEventListener('touchend', forcePlay);
+          video.addEventListener('mousedown', forcePlay);
+
+          // Also add to container for better mobile support
+          if (containerRef.current) {
+            containerRef.current.addEventListener('touchstart', forcePlay);
+            containerRef.current.addEventListener('click', forcePlay);
+          }
         } else {
           console.error('Video ref not found');
         }
@@ -390,16 +431,40 @@ export default function ARWorldViewer({
                     <li>• Try refreshing the page</li>
                   </ul>
 
-                  <Button
-                    onClick={() => {
-                      console.log('Retrying camera...');
-                      startCamera();
-                    }}
-                    className="mt-3 w-full bg-white/20 hover:bg-white/30 text-white border-white/30"
-                    size="sm">
-                    <RefreshCw className="h-3 w-3 mr-1" />
-                    Retry Camera
-                  </Button>
+                  <div className="flex gap-2 mt-3">
+                    <Button
+                      onClick={() => {
+                        console.log('Retrying camera...');
+                        startCamera();
+                      }}
+                      className="flex-1 bg-white/20 hover:bg-white/30 text-white border-white/30"
+                      size="sm">
+                      <RefreshCw className="h-3 w-3 mr-1" />
+                      Retry
+                    </Button>
+
+                    <Button
+                      onClick={() => {
+                        console.log('Requesting camera permission...');
+                        navigator.mediaDevices
+                          ?.getUserMedia({ video: true })
+                          .then(stream => {
+                            console.log(
+                              'Permission granted, stopping test stream'
+                            );
+                            stream.getTracks().forEach(track => track.stop());
+                            startCamera();
+                          })
+                          .catch(err => {
+                            console.error('Permission request failed:', err);
+                          });
+                      }}
+                      className="flex-1 bg-green-500/80 hover:bg-green-600/80 text-white"
+                      size="sm">
+                      <Camera className="h-3 w-3 mr-1" />
+                      Permission
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -453,6 +518,21 @@ export default function ARWorldViewer({
             )}
           </div>
 
+          {/* Mobile Camera Info */}
+          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-black/50 text-white px-3 py-1 rounded-full text-xs">
+            {location.protocol === 'https:' ? (
+              <span className="flex items-center gap-1">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                HTTPS ✓
+              </span>
+            ) : (
+              <span className="flex items-center gap-1">
+                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                HTTP ✗ (Camera won't work)
+              </span>
+            )}
+          </div>
+
           {/* AR Crosshair */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="w-16 h-16 border-2 border-white/50 rounded-full relative">
@@ -496,11 +576,11 @@ export default function ARWorldViewer({
         </Canvas>
       )}
 
-      {/* AR Experience Button - Bottom Center */}
-      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50">
+      {/* Main AR Experience Button - Bottom Center, Always Accessible */}
+      <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-[9999]">
         <Button
           onClick={cameraActive ? stopCamera : startCamera}
-          className="gap-2 bg-primary hover:bg-primary/90 shadow-lg text-white font-medium px-6 py-3">
+          className="gap-2 bg-primary hover:bg-primary/90 shadow-lg text-white font-medium px-6 py-3 min-w-[140px]">
           {cameraActive ? (
             <>
               <X className="h-5 w-5" />
@@ -515,84 +595,85 @@ export default function ARWorldViewer({
         </Button>
       </div>
 
-      {/* Fallback Button - Always Visible */}
-      <div className="absolute bottom-20 left-4 z-50">
-        <Button
-          onClick={cameraActive ? stopCamera : startCamera}
-          variant="secondary"
-          className="gap-2 bg-white/90 text-black hover:bg-white shadow-lg">
-          {cameraActive ? (
-            <>
-              <X className="h-4 w-4" />
-              Stop
-            </>
-          ) : (
-            <>
-              <Camera className="h-4 w-4" />
-              Start
-            </>
-          )}
-        </Button>
-      </div>
-
-      {/* Test Model Button */}
-      <div className="absolute bottom-20 right-4 z-50">
-        <Button
-          onClick={() => {
-            const testModel = {
-              id: Date.now().toString(),
-              position: [0, 0, -1] as [number, number, number],
-              rotation: [0, 0, 0] as [number, number, number]
-            };
-            setPlacedModels(prev => [...prev, testModel]);
-            console.log('Test model added at center');
-          }}
-          variant="outline"
-          className="gap-2 bg-blue-500/90 text-white hover:bg-blue-600">
-          <Target className="h-4 w-4" />
-          Test Model
-        </Button>
-      </div>
-
-      {/* Debug Video Ref Button */}
-      <div className="absolute bottom-32 left-4 z-50">
-        <Button
-          onClick={() => {
-            console.log('Video ref status:', {
-              exists: !!videoRef.current,
-              element: videoRef.current,
-              tagName: videoRef.current?.tagName,
-              readyState: videoRef.current?.readyState
-            });
-          }}
-          variant="outline"
-          size="sm"
-          className="gap-2 bg-yellow-500/90 text-white hover:bg-yellow-600">
-          <Info className="h-4 w-4" />
-          Debug Video
-        </Button>
-      </div>
-
-      {/* Control Buttons */}
-      {cameraActive && (
-        <div className="absolute bottom-4 right-4 flex gap-2">
+      {/* Control Buttons Row - Always Accessible */}
+      <div className="fixed bottom-20 left-4 right-4 z-[9998] flex justify-between items-center">
+        {/* Left Side - Camera Controls */}
+        <div className="flex gap-2">
           <Button
-            size="icon"
+            onClick={cameraActive ? stopCamera : startCamera}
             variant="secondary"
-            onClick={resetModels}
-            className="rounded-full bg-background/80 backdrop-blur-sm">
-            <RotateCcw className="h-4 w-4" />
+            className="gap-2 bg-white/90 text-black hover:bg-white shadow-lg min-w-[80px]">
+            {cameraActive ? (
+              <>
+                <X className="h-4 w-4" />
+                Stop
+              </>
+            ) : (
+              <>
+                <Camera className="h-4 w-4" />
+                Start
+              </>
+            )}
           </Button>
 
+          {/* Debug Video Ref Button */}
           <Button
-            size="icon"
-            variant="secondary"
-            onClick={() => setShowInfo(!showInfo)}
-            className="rounded-full bg-background/80 backdrop-blur-sm">
+            onClick={() => {
+              console.log('Video ref status:', {
+                exists: !!videoRef.current,
+                element: videoRef.current,
+                tagName: videoRef.current?.tagName,
+                readyState: videoRef.current?.readyState
+              });
+            }}
+            variant="outline"
+            size="sm"
+            className="gap-2 bg-yellow-500/90 text-white hover:bg-yellow-600 min-w-[80px]">
             <Info className="h-4 w-4" />
+            Debug
           </Button>
         </div>
-      )}
+
+        {/* Right Side - Model Controls */}
+        <div className="flex gap-2">
+          {/* Test Model Button */}
+          <Button
+            onClick={() => {
+              const testModel = {
+                id: Date.now().toString(),
+                position: [0, 0, -1] as [number, number, number],
+                rotation: [0, 0, 0] as [number, number, number]
+              };
+              setPlacedModels(prev => [...prev, testModel]);
+              console.log('Test model added at center');
+            }}
+            variant="outline"
+            className="gap-2 bg-blue-500/90 text-white hover:bg-blue-600 min-w-[80px]">
+            <Target className="h-4 w-4" />
+            Test
+          </Button>
+
+          {/* Reset Models Button - Always Visible */}
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={resetModels}
+            className="rounded-full bg-background/80 backdrop-blur-sm min-w-[40px] h-[40px] p-0">
+            <RotateCcw className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Info Button - Always Accessible */}
+      <div className="fixed top-4 right-4 z-[9997]">
+        <Button
+          size="icon"
+          variant="secondary"
+          onClick={() => setShowInfo(!showInfo)}
+          className="rounded-full bg-background/80 backdrop-blur-sm shadow-lg">
+          <Info className="h-4 w-4" />
+        </Button>
+      </div>
 
       {/* Info Panel */}
       {showInfo && (
