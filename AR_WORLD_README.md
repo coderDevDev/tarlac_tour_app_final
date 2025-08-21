@@ -142,3 +142,4 @@ For issues or questions:
 ---
 
 **Note**: AR World requires modern hardware and browser support. For the best experience, use Chrome on a recent Android device or Safari on iOS 13+.
+

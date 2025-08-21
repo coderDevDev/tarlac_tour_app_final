@@ -11,7 +11,7 @@ import {
 } from '@react-three/drei';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Info, RotateCcw, X, Camera, Globe } from 'lucide-react';
+import { Info, RotateCcw, X, Camera, Globe, Target } from 'lucide-react';
 import * as THREE from 'three';
 
 interface ModelProps {
@@ -57,6 +57,7 @@ export default function ARWorldViewer({
   const [showInfo, setShowInfo] = useState(false);
   const [arSupported, setArSupported] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [placedModels, setPlacedModels] = useState<
     Array<{
       id: string;
@@ -64,6 +65,9 @@ export default function ARWorldViewer({
       rotation: [number, number, number];
     }>
   >([]);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Check AR support
   useEffect(() => {
@@ -106,16 +110,72 @@ export default function ARWorldViewer({
     try {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' }
+          video: {
+            facingMode: 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }
         });
+
+        setCameraStream(stream);
         setCameraActive(true);
-        // Store stream for cleanup
+
+        // Set up video element
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+        }
+
         return stream;
       }
     } catch (error) {
       console.error('Camera access failed:', error);
     }
   };
+
+  const stopCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      setCameraStream(null);
+    }
+    setCameraActive(false);
+  };
+
+  // Handle touch/click to place models
+  const handleContainerClick = (event: React.MouseEvent) => {
+    if (!cameraActive || !containerRef.current) return;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+    // Place model at calculated position - make it more visible
+    const newModel = {
+      id: Date.now().toString(),
+      position: [x * 1.5, -y * 1.5, -2] as [number, number, number], // Closer and more visible
+      rotation: [0, 0, 0] as [number, number, number]
+    };
+
+    console.log('Placing model at:', newModel.position, 'from click at:', {
+      x: event.clientX,
+      y: event.clientY
+    });
+    setPlacedModels(prev => [...prev, newModel]);
+  };
+
+  // Debug info
+  useEffect(() => {
+    if (cameraActive) {
+      console.log('Camera active, models count:', placedModels.length);
+    }
+  }, [cameraActive, placedModels.length]);
+
+  // Cleanup camera on unmount
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, []);
 
   if (!arSupported) {
     return (
@@ -142,32 +202,70 @@ export default function ARWorldViewer({
   }
 
   return (
-    <div className="relative w-full h-full">
-      {/* AR Experience Button */}
-      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10">
-        <Button
-          onClick={startCamera}
-          className="gap-2 bg-primary hover:bg-primary/90">
-          <Globe className="h-4 w-4" />
-          Start AR Experience
-        </Button>
-      </div>
-
-      {/* Camera Feed or 3D Scene */}
+    <div className="relative w-full h-full" ref={containerRef}>
+      {/* Camera Feed with 3D Overlay */}
       {cameraActive ? (
-        <div className="w-full h-full bg-black">
-          {/* Camera feed would go here in a real AR implementation */}
-          <div className="flex items-center justify-center h-full text-white">
-            <div className="text-center">
-              <Camera className="h-16 w-16 mx-auto mb-4 text-white/50" />
-              <p className="text-lg font-medium mb-2">Camera Active</p>
-              <p className="text-sm text-white/70">
-                Point camera at flat surfaces to place {siteName}
-              </p>
+        <div className="w-full h-full relative">
+          {/* Real Camera Feed */}
+          <video
+            ref={videoRef}
+            className="w-full h-full object-cover"
+            playsInline
+            muted
+            autoPlay
+          />
+
+          {/* 3D Models Overlay */}
+          <div className="absolute inset-0 pointer-events-none">
+            <Canvas
+              style={{ width: '100%', height: '100%' }}
+              camera={{ position: [0, 0, 5], fov: 75 }}
+              gl={{ alpha: true, antialias: true }}>
+              <PerspectiveCamera makeDefault position={[0, 0, 5]} fov={75} />
+              <ambientLight intensity={0.8} />
+              <directionalLight position={[10, 10, 5]} intensity={1.5} />
+
+              {/* Placed Models */}
+              {placedModels.map(model => (
+                <ARModel
+                  key={model.id}
+                  url={modelUrl}
+                  position={model.position}
+                />
+              ))}
+            </Canvas>
+          </div>
+
+          {/* Visual Feedback for Model Placement */}
+          {placedModels.length > 0 && (
+            <div className="absolute top-4 right-4 bg-green-500/90 text-white px-3 py-1 rounded-full text-sm font-medium">
+              {placedModels.length} model{placedModels.length !== 1 ? 's' : ''}{' '}
+              placed
             </div>
+          )}
+
+          {/* AR Crosshair */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="w-16 h-16 border-2 border-white/50 rounded-full relative">
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-white rounded-full"></div>
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 border border-white/30 rounded-full"></div>
+            </div>
+          </div>
+
+          {/* Placement Instructions */}
+          <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2 text-center">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-background/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg">
+              <p className="text-sm font-medium text-white">
+                Tap anywhere to place {siteName}
+              </p>
+            </motion.div>
           </div>
         </div>
       ) : (
+        /* 3D Model Preview when camera is off */
         <Canvas
           style={{ width: '100%', height: '100%' }}
           camera={{ position: [0, 0, 5], fov: 75 }}>
@@ -188,6 +286,27 @@ export default function ARWorldViewer({
           />
         </Canvas>
       )}
+
+      {/* AR Experience Button - Bottom Center */}
+      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10">
+        <div className="bg-background/20 backdrop-blur-sm rounded-full p-1">
+          <Button
+            onClick={cameraActive ? stopCamera : startCamera}
+            className="gap-2 bg-primary hover:bg-primary/90 shadow-lg">
+            {cameraActive ? (
+              <>
+                <X className="h-4 w-4" />
+                Stop AR
+              </>
+            ) : (
+              <>
+                <Globe className="h-4 w-4" />
+                Start AR Experience
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
 
       {/* Control Buttons */}
       {cameraActive && (
@@ -220,7 +339,8 @@ export default function ARWorldViewer({
             className="glass p-4 rounded-xl shadow-lg max-w-xs bg-background/90 backdrop-blur-sm">
             <h3 className="font-bold mb-2">{siteName}</h3>
             <p className="text-sm text-muted-foreground mb-3">
-              Point your camera at a flat surface and tap to place the 3D model.
+              Tap anywhere on the screen to place the 3D model in your
+              environment.
             </p>
             <div className="flex gap-2">
               <Button
@@ -230,20 +350,6 @@ export default function ARWorldViewer({
                 Got it
               </Button>
             </div>
-          </motion.div>
-        </div>
-      )}
-
-      {/* Model Placement Instructions */}
-      {cameraActive && placedModels.length === 0 && (
-        <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-background/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg">
-            <p className="text-sm font-medium">
-              Point camera at a flat surface and tap to place {siteName}
-            </p>
           </motion.div>
         </div>
       )}
@@ -267,6 +373,15 @@ export default function ARWorldViewer({
             ))}
           </div>
         </div>
+      )}
+
+      {/* Click Handler for Model Placement */}
+      {cameraActive && (
+        <div
+          className="absolute inset-0 z-10 cursor-crosshair"
+          onClick={handleContainerClick}
+          style={{ pointerEvents: 'auto' }}
+        />
       )}
     </div>
   );
