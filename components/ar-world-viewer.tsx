@@ -106,6 +106,10 @@ function ARModel({
   const handleTouchStart = (event: any) => {
     if (!isSelected || !onTransform) return;
 
+    // Prevent camera from responding to these touches
+    event.stopPropagation();
+    event.preventDefault();
+
     const touches = event.touches;
     touchState.current.startX = touches[0].clientX;
     touchState.current.startY = touches[0].clientY;
@@ -128,8 +132,11 @@ function ARModel({
   const handleTouchMove = (event: any) => {
     if (!isSelected || !onTransform) return;
 
-    const touches = event.touches;
+    // Aggressively prevent camera interference
+    event.stopPropagation();
     event.preventDefault();
+
+    const touches = event.touches;
 
     if (touchState.current.isDragging && touches.length === 1) {
       const deltaX = (touches[0].clientX - touchState.current.startX) * 0.01;
@@ -164,7 +171,13 @@ function ARModel({
     }
   };
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = (event: any) => {
+    // Prevent camera from responding to touch end
+    if (isSelected) {
+      event.stopPropagation();
+      event.preventDefault();
+    }
+
     touchState.current.isDragging = false;
     touchState.current.isRotating = false;
     touchState.current.isScaling = false;
@@ -850,7 +863,7 @@ export default function ARWorldViewer({
         <div className="fixed top-24 right-4 z-[9997]">
           <div className="bg-background/95 backdrop-blur-md rounded-xl p-3 shadow-xl border-2 border-blue-500/20 max-w-[200px]">
             <div className="text-center text-sm font-medium text-blue-600 mb-2">
-              Touch Gestures
+              Touch Gestures Active
             </div>
             <div className="text-xs space-y-1 text-muted-foreground">
               <div>
@@ -862,6 +875,9 @@ export default function ARWorldViewer({
               <div>
                 • <strong>Pinch:</strong> Scale model
               </div>
+            </div>
+            <div className="mt-2 text-xs text-blue-500 font-medium">
+              Camera is locked during manipulation
             </div>
           </div>
         </div>
@@ -1154,6 +1170,34 @@ export default function ARWorldViewer({
             ))}
           </div>
         </div>
+      )}
+
+      {/* Touch Event Isolation Layer - Prevents camera interference during model manipulation */}
+      {cameraActive && (
+        <div
+          className="absolute inset-0 z-10"
+          style={{ pointerEvents: 'none' }}
+          onTouchStart={e => {
+            // Only allow touches when in place mode or when touching models
+            if (interactionMode === 'place') {
+              e.stopPropagation();
+            }
+          }}
+          onTouchMove={e => {
+            // Prevent camera movement during model manipulation
+            if (selectedModelId && interactionMode === 'transform') {
+              e.stopPropagation();
+              e.preventDefault();
+            }
+          }}
+          onTouchEnd={e => {
+            // Prevent camera interference
+            if (selectedModelId && interactionMode === 'transform') {
+              e.stopPropagation();
+              e.preventDefault();
+            }
+          }}
+        />
       )}
 
       {/* Click Handler for Model Placement */}
