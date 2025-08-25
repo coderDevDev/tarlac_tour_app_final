@@ -231,8 +231,8 @@ function ARCameraContent() {
 
       console.log('Requesting camera permission...');
 
-      // Request camera access with explicit constraints for better WebView compatibility
-      const stream = await navigator.mediaDevices.getUserMedia({
+      // Add timeout to prevent hanging
+      const permissionPromise = navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: 'environment',
           width: { ideal: 1280, max: 1920, min: 640 },
@@ -241,10 +241,27 @@ function ARCameraContent() {
         audio: false
       });
 
+      // Add 10 second timeout
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(
+          () =>
+            reject(
+              new Error('Permission request timeout - no response from device')
+            ),
+          10000
+        );
+      });
+
+      // Race between permission request and timeout
+      const stream = (await Promise.race([
+        permissionPromise,
+        timeoutPromise
+      ])) as MediaStream;
+
       console.log('Camera permission granted, stream obtained:', stream);
 
       // Stop the test stream immediately
-      stream.getTracks().forEach(track => {
+      stream.getTracks().forEach((track: MediaStreamTrack) => {
         console.log('Stopping test track:', track);
         track.stop();
       });
@@ -257,7 +274,11 @@ function ARCameraContent() {
     } catch (err: any) {
       console.error('Error requesting camera permission:', err);
 
-      if (
+      if (err.message.includes('timeout')) {
+        setError(
+          'Permission request timed out. Please check if the permission dialog appeared and try again.'
+        );
+      } else if (
         err.name === 'NotAllowedError' ||
         err.message.includes('Permission denied')
       ) {
@@ -563,6 +584,59 @@ function ARCameraContent() {
                           : 'Request Camera Permission'}
                       </>
                     )}
+                  </Button>
+
+                  {/* Debug: Direct permission test */}
+                  <Button
+                    onClick={async () => {
+                      try {
+                        console.log('Testing direct permission request...');
+                        const stream =
+                          await navigator.mediaDevices.getUserMedia({
+                            video: true
+                          });
+                        console.log('Direct permission success:', stream);
+                        stream.getTracks().forEach(track => track.stop());
+                        setError('Direct permission test successful!');
+                      } catch (err: any) {
+                        console.error('Direct permission test failed:', err);
+                        setError(
+                          `Direct test failed: ${err.message || err.name}`
+                        );
+                      }
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="text-xs">
+                    Test Direct Permission
+                  </Button>
+
+                  {/* Debug: Check WebView environment */}
+                  <Button
+                    onClick={() => {
+                      const info = {
+                        userAgent: navigator.userAgent,
+                        platform: navigator.platform,
+                        vendor: navigator.vendor,
+                        mediaDevices: !!navigator.mediaDevices,
+                        permissions: !!navigator.permissions,
+                        webView:
+                          navigator.userAgent.includes('wv') ||
+                          navigator.userAgent.includes('WebView'),
+                        location: location.href,
+                        protocol: location.protocol
+                      };
+                      console.log('WebView Environment Info:', info);
+                      setError(
+                        `WebView: ${info.webView}, HTTPS: ${
+                          info.protocol === 'https:'
+                        }, MediaDevices: ${info.mediaDevices}`
+                      );
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="text-xs">
+                    Check Environment
                   </Button>
 
                   <Button
