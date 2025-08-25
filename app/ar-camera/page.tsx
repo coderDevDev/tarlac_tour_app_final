@@ -365,7 +365,8 @@ export default function ARCameraPage() {
       let extractedSiteId: string | null = null;
 
       // Case 1: Full URL (e.g., https://example.com/ar-camera?siteId=site-id)
-      if (data.includes('/ar-camera?siteId=')) {
+
+      if (data.includes('/ar-world?siteId=')) {
         try {
           const url = new URL(data);
           extractedSiteId = url.searchParams.get('siteId');
@@ -378,7 +379,7 @@ export default function ARCameraPage() {
         }
       }
       // Case 2: Just the path (e.g., /ar-camera?siteId=site-id)
-      else if (data.startsWith('/ar-camera?siteId=')) {
+      else if (data.startsWith('/ar-world?siteId=')) {
         const params = new URLSearchParams(data.split('?')[1]);
         extractedSiteId = params.get('siteId');
       }
@@ -393,7 +394,7 @@ export default function ARCameraPage() {
         setCameraActive(false);
 
         // Navigate to the AR experience
-        router.push(`/ar-camera?siteId=${extractedSiteId}`);
+        router.push(`/ar-world?siteId=${extractedSiteId}`);
       } else {
         setError('Invalid QR code. Please scan a valid heritage site QR code.');
       }
