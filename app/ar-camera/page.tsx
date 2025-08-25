@@ -146,9 +146,21 @@ function ARCameraContent() {
 
       console.log('Video element found, setting up stream');
 
-      // Set up video element
-      videoRef.current.srcObject = null; // Clear any existing source
-      videoRef.current.srcObject = stream;
+      // Set up video element with proper attributes
+      const video = videoRef.current;
+      video.srcObject = null; // Clear any existing source
+      video.srcObject = stream;
+
+      // Ensure video attributes are set for WebView compatibility
+      video.playsInline = true;
+      video.muted = true;
+      video.autoplay = true;
+      video.setAttribute('playsinline', 'true');
+      video.setAttribute('webkit-playsinline', 'true');
+      video.setAttribute('muted', 'true');
+      video.setAttribute('autoplay', 'true');
+
+      console.log('Video element configured with stream');
 
       // Wait for video to be ready with better error handling
       await new Promise<void>((resolve, reject) => {
@@ -236,9 +248,22 @@ function ARCameraContent() {
 
       // Start QR scanning after camera is ready
       console.log('Camera ready, starting QR scanning...');
-      setTimeout(() => {
-        startQrScanning();
-      }, 1000); // Small delay to ensure video is stable
+
+      // Wait a bit more for video to be fully stable, then start scanning
+      setTimeout(async () => {
+        try {
+          console.log('Attempting to start QR scanning...');
+          await startQrScanning();
+          console.log('QR scanning started successfully');
+        } catch (scanError) {
+          console.error('Failed to start QR scanning:', scanError);
+          setError(
+            'Camera started but QR scanning failed. You can still use the camera.'
+          );
+          // Don't fail the camera start - just disable scanning
+          setScanning(false);
+        }
+      }, 2000); // Increased delay to 2 seconds for better stability
 
       setCameraPermission('granted');
       setCameraActive(true);
@@ -361,6 +386,7 @@ function ARCameraContent() {
 
   // Start QR scanning with better camera availability checks
   const startQrScanning = async () => {
+    console.log('=== STARTING QR SCANNING ===');
     setScanning(true);
     setError(null);
 
@@ -373,12 +399,28 @@ function ARCameraContent() {
       const video = videoRef.current;
       const canvas = canvasRef.current;
 
-      // Wait for video to be ready
+      console.log('Video element status:', {
+        readyState: video.readyState,
+        videoWidth: video.videoWidth,
+        videoHeight: video.videoHeight,
+        srcObject: !!video.srcObject,
+        paused: video.paused,
+        ended: video.ended
+      });
+
+      // Wait for video to be ready with timeout
       if (video.readyState < video.HAVE_METADATA) {
         console.log('Waiting for video to be ready...');
-        await new Promise<void>(resolve => {
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(
+              new Error('Video ready timeout - video took too long to load')
+            );
+          }, 10000); // 10 second timeout
+
           const checkReady = () => {
             if (video.readyState >= video.HAVE_METADATA) {
+              clearTimeout(timeout);
               resolve();
             } else {
               setTimeout(checkReady, 100);
@@ -393,10 +435,25 @@ function ARCameraContent() {
         throw new Error('Video dimensions not available');
       }
 
+      // Check if camera stream is actually working
+      if (!streamRef.current || streamRef.current.getTracks().length === 0) {
+        throw new Error('Camera stream not available');
+      }
+
+      // Check if stream tracks are active
+      const activeTracks = streamRef.current
+        .getTracks()
+        .filter(track => track.readyState === 'live');
+      if (activeTracks.length === 0) {
+        throw new Error('No active camera tracks');
+      }
+
       console.log('Video ready for scanning:', {
         width: video.videoWidth,
         height: video.videoHeight,
-        readyState: video.readyState
+        readyState: video.readyState,
+        streamTracks: streamRef.current.getTracks().length,
+        activeTracks: activeTracks.length
       });
 
       // Dynamically import jsQR
@@ -409,9 +466,28 @@ function ARCameraContent() {
         clearInterval(window.qrScanInterval);
       }
 
-      // Create a scanning interval with better error handling
+      // Create a scanning interval with better error handling and frame counter
+      let frameCount = 0;
+      const maxFrames = 1000; // Stop after 1000 frames to prevent infinite scanning
+
       window.qrScanInterval = setInterval(() => {
         try {
+          frameCount++;
+
+          // Safety check: stop scanning after too many frames
+          if (frameCount > maxFrames) {
+            console.warn('Max frames reached, stopping scanning');
+            if (window.qrScanInterval) {
+              clearInterval(window.qrScanInterval);
+              window.qrScanInterval = null;
+            }
+            setScanning(false);
+            setError(
+              'Scanning stopped after maximum frames. Please restart camera.'
+            );
+            return;
+          }
+
           if (!videoRef.current || !canvasRef.current) {
             console.warn('Video or canvas refs lost during scanning');
             return;
@@ -474,6 +550,11 @@ function ARCameraContent() {
               setScanning(false);
               processQrCode(code.data);
             }
+          }
+
+          // Log every 100 frames for debugging
+          if (frameCount % 100 === 0) {
+            console.log(`QR scanning: ${frameCount} frames processed`);
           }
         } catch (scanError) {
           console.error('Error during QR scanning:', scanError);
@@ -620,7 +701,7 @@ function ARCameraContent() {
         AR Experience
       </motion.h1>
 
-      {/* Always render video element but hide when not needed */}
+      {/* Always render video and canvas elements for proper refs */}
       <div className="hidden">
         <video
           ref={videoRef}
@@ -628,6 +709,7 @@ function ARCameraContent() {
           playsInline
           muted
           autoPlay
+          webkit-playsinline="true"
         />
         <canvas ref={canvasRef} className="hidden" />
       </div>
@@ -914,10 +996,19 @@ function ARCameraContent() {
                 playsInline
                 muted
                 autoPlay
+                webkit-playsinline="true"
+                style={{
+                  transform: 'scaleX(-1)', // Mirror the camera for better UX
+                  objectFit: 'cover'
+                }}
               />
 
-              {/* Canvas for QR code detection (hidden) */}
-              <canvas ref={canvasRef} className="hidden" />
+              {/* Canvas for QR code detection - visible but transparent */}
+              <canvas
+                ref={canvasRef}
+                className="absolute inset-0 w-full h-full opacity-0 pointer-events-none z-20"
+                style={{ imageRendering: 'pixelated' }}
+              />
 
               {/* Camera starting overlay */}
               {isLoading && (
@@ -928,6 +1019,21 @@ function ARCameraContent() {
                   </div>
                 </div>
               )}
+
+              {/* Camera status indicator */}
+              <div className="absolute top-4 left-4 bg-black/50 text-white px-3 py-1 rounded-full text-xs z-30">
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`w-2 h-2 rounded-full ${
+                      streamRef.current
+                        ? 'bg-green-500 animate-pulse'
+                        : 'bg-yellow-500 animate-pulse'
+                    }`}></div>
+                  <span>
+                    {streamRef.current ? 'Camera Active' : 'Camera Loading...'}
+                  </span>
+                </div>
+              </div>
 
               {/* Scanning overlay */}
               <div className="absolute inset-0 pointer-events-none z-20">
@@ -951,18 +1057,64 @@ function ARCameraContent() {
                 </div>
               )}
 
-              {/* Close button */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute top-4 right-4 bg-black/50 text-white hover:bg-black/70 rounded-full z-30"
-                onClick={() => setCameraActive(false)}>
-                <X className="h-4 w-4" />
-              </Button>
+              {/* Camera controls */}
+              <div className="absolute top-4 right-4 flex gap-2 z-30">
+                {/* Stop scanning button */}
+                {scanning && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="bg-red-500/80 text-white hover:bg-red-600/80 rounded-full px-3 py-1 text-xs"
+                    onClick={() => {
+                      if (window.qrScanInterval) {
+                        clearInterval(window.qrScanInterval);
+                        window.qrScanInterval = null;
+                      }
+                      setScanning(false);
+                      setError('QR scanning stopped manually');
+                    }}>
+                    Stop Scanning
+                  </Button>
+                )}
+
+                {/* Close button */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="bg-black/50 text-white hover:bg-black/70 rounded-full"
+                  onClick={() => setCameraActive(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
 
             <div className="mt-4 text-sm text-center text-muted-foreground">
               <p>Position the QR code within the frame to scan</p>
+
+              {/* Manual QR scanning controls */}
+              <div className="mt-3 flex gap-2 justify-center">
+                {!scanning && (
+                  <Button
+                    onClick={async () => {
+                      try {
+                        await startQrScanning();
+                      } catch (err) {
+                        setError('Failed to start QR scanning manually');
+                      }
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="text-xs">
+                    Start QR Scanning
+                  </Button>
+                )}
+
+                {scanning && (
+                  <div className="text-xs text-green-600 font-medium">
+                    ✓ QR Scanning Active
+                  </div>
+                )}
+              </div>
             </div>
 
             {error && (
