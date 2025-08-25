@@ -204,6 +204,20 @@ export default function ARWorldViewer({
       autoStartCamera();
     }, 1000); // 1 second delay
 
+    // Add a timeout to prevent camera from getting stuck
+    const cameraTimeout = setTimeout(() => {
+      if (!cameraStream && cameraActive) {
+        console.warn('Camera taking too long, resetting state...');
+        setCameraActive(false);
+        setCameraStream(null);
+      }
+    }, 15000); // 15 second timeout
+
+    return () => {
+      clearTimeout(autoStartTimer);
+      clearTimeout(cameraTimeout);
+    };
+
     return () => clearTimeout(autoStartTimer);
   }, []);
 
@@ -443,14 +457,99 @@ export default function ARWorldViewer({
         return;
       }
 
-      // Try to start camera
-      await startCamera();
+      // Check if getUserMedia is supported
+      if (!navigator.mediaDevices?.getUserMedia) {
+        console.warn('getUserMedia not supported');
+        return;
+      }
+
+      // Check if video element is available
+      if (!videoRef.current) {
+        console.log(
+          'Video element not found, waiting for it to be available...'
+        );
+        // Wait a bit for the video element to be rendered
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        if (!videoRef.current) {
+          console.error('Video element still not available after delay');
+          return;
+        }
+      }
+
+      // Try to start camera directly here instead of calling startCamera
+      console.log('Requesting camera access for auto-start...');
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      });
+
+      console.log('Camera stream obtained for auto-start:', stream);
+      setCameraStream(stream);
+      setCameraActive(true);
+
+      // Set up video element with proper attributes (like ar-camera/page.tsx)
+      if (videoRef.current) {
+        const video = videoRef.current;
+
+        // Clear any existing source
+        video.srcObject = null;
+        video.srcObject = stream;
+
+        // Set video properties
+        video.playsInline = true;
+        video.muted = true;
+        video.autoplay = true;
+
+        // Set attributes for WebView compatibility
+        video.setAttribute('playsinline', 'true');
+        video.setAttribute('webkit-playsinline', 'true');
+        video.setAttribute('muted', 'true');
+        video.setAttribute('autoplay', 'true');
+
+        // Handle video loading and playing (like ar-camera/page.tsx)
+        video.onloadedmetadata = () => {
+          console.log('Video metadata loaded, playing video');
+          if (video) {
+            video
+              .play()
+              .then(() => {
+                console.log('Video playing successfully for auto-start');
+              })
+              .catch(err => {
+                console.error('Error playing video:', err);
+                // Don't fail - video might still work for AR overlay
+              });
+          }
+        };
+      }
+
       console.log('Camera auto-started successfully');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Auto-start camera failed:', error);
-      // Don't show error to user - just log it
+
+      // Better error handling like ar-camera/page.tsx
+      if (
+        error.name === 'NotAllowedError' ||
+        error.name === 'PermissionDeniedError'
+      ) {
+        console.warn('Camera permission denied during auto-start');
+        // Don't show error to user - just log it
+      } else if (
+        error.name === 'NotFoundError' ||
+        error.name === 'DevicesNotFoundError'
+      ) {
+        console.warn('No camera found during auto-start');
+      } else {
+        console.warn('Camera auto-start failed:', error.message || error.name);
+      }
     }
-  }, [cameraActive, startCamera]);
+  }, [cameraActive]);
 
   // Handle user interaction to trigger camera (required for permissions)
   const handleUserInteraction = useCallback(() => {
@@ -630,9 +729,13 @@ export default function ARWorldViewer({
             <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center z-10">
               <div className="text-center text-white">
                 <Camera className="h-16 w-16 mx-auto mb-4 opacity-50 animate-pulse" />
-                <p className="text-lg font-medium mb-2">Starting Camera...</p>
+                <p className="text-lg font-medium mb-2">
+                  {cameraActive ? 'Starting Camera...' : 'Camera Loading...'}
+                </p>
                 <p className="text-sm opacity-75 mb-4">
-                  Please allow camera permissions when prompted
+                  {cameraActive
+                    ? 'Setting up camera stream...'
+                    : 'Please allow camera permissions when prompted'}
                 </p>
 
                 {/* Auto-start indicator */}
@@ -646,6 +749,14 @@ export default function ARWorldViewer({
                     <li>• Allow permissions when asked</li>
                   </ul>
                 </div>
+
+                {/* Manual trigger button */}
+                <Button
+                  onClick={autoStartCamera}
+                  className="mt-4 bg-white/20 hover:bg-white/30 text-white border-white/30"
+                  size="sm">
+                  Start Camera Now
+                </Button>
               </div>
             </div>
           )}
@@ -702,6 +813,11 @@ export default function ARWorldViewer({
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                 Camera Active
               </span>
+            ) : cameraActive ? (
+              <span className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                Starting Camera...
+              </span>
             ) : (
               <span className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
@@ -731,6 +847,16 @@ export default function ARWorldViewer({
               <span className="flex items-center gap-1">
                 <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
                 Camera Error
+              </span>
+            </div>
+          )}
+
+          {/* Loading State Indicator */}
+          {cameraActive && !cameraStream && (
+            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-blue-500/90 text-white px-3 py-1 rounded-full text-xs">
+              <span className="flex items-center gap-1">
+                <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                Starting Camera...
               </span>
             </div>
           )}
