@@ -45,12 +45,31 @@ function ARModel({
   isSelected = false,
   onSelect,
   onDeselect,
-  onRefReady
-}: ModelProps & { onRefReady?: (ref: React.RefObject<THREE.Group>) => void }) {
+  onRefReady,
+  onTransform
+}: ModelProps & {
+  onRefReady?: (ref: React.RefObject<THREE.Group>) => void;
+  onTransform?: (updates: {
+    position?: [number, number, number];
+    rotation?: [number, number, number];
+    scale?: number;
+  }) => void;
+}) {
   const { scene, animations } = useGLTF(url);
   const { actions, mixer } = useAnimations(animations, scene);
   const meshRef = useRef<THREE.Mesh>(null);
   const groupRef = useRef<THREE.Group>(null);
+
+  // Touch gesture state
+  const touchState = useRef({
+    startX: 0,
+    startY: 0,
+    startDistance: 0,
+    startRotation: 0,
+    isDragging: false,
+    isRotating: false,
+    isScaling: false
+  });
 
   useEffect(() => {
     // Play the first animation if available
@@ -83,6 +102,74 @@ function ARModel({
     }
   };
 
+  // Touch gesture handlers
+  const handleTouchStart = (event: any) => {
+    if (!isSelected || !onTransform) return;
+
+    const touches = event.touches;
+    touchState.current.startX = touches[0].clientX;
+    touchState.current.startY = touches[0].clientY;
+
+    if (touches.length === 1) {
+      touchState.current.isDragging = true;
+    } else if (touches.length === 2) {
+      touchState.current.isRotating = true;
+      touchState.current.startDistance = Math.hypot(
+        touches[1].clientX - touches[0].clientX,
+        touches[1].clientY - touches[0].clientY
+      );
+      touchState.current.startRotation = Math.atan2(
+        touches[1].clientY - touches[0].clientY,
+        touches[1].clientX - touches[0].clientX
+      );
+    }
+  };
+
+  const handleTouchMove = (event: any) => {
+    if (!isSelected || !onTransform) return;
+
+    const touches = event.touches;
+    event.preventDefault();
+
+    if (touchState.current.isDragging && touches.length === 1) {
+      const deltaX = (touches[0].clientX - touchState.current.startX) * 0.01;
+      const deltaY = (touches[0].clientY - touchState.current.startY) * 0.01;
+
+      onTransform({
+        position: [position[0] + deltaX, position[1] - deltaY, position[2]]
+      });
+
+      touchState.current.startX = touches[0].clientX;
+      touchState.current.startY = touches[0].clientY;
+    } else if (touchState.current.isRotating && touches.length === 2) {
+      const currentDistance = Math.hypot(
+        touches[1].clientX - touches[0].clientX,
+        touches[1].clientY - touches[0].clientY
+      );
+      const currentRotation = Math.atan2(
+        touches[1].clientY - touches[0].clientY,
+        touches[1].clientX - touches[0].clientX
+      );
+
+      const rotationDelta = currentRotation - touchState.current.startRotation;
+      const scaleDelta = currentDistance / touchState.current.startDistance;
+
+      onTransform({
+        rotation: [rotation[0], rotation[1] + rotationDelta, rotation[2]],
+        scale: scale * scaleDelta
+      });
+
+      touchState.current.startDistance = currentDistance;
+      touchState.current.startRotation = currentRotation;
+    }
+  };
+
+  const handleTouchEnd = () => {
+    touchState.current.isDragging = false;
+    touchState.current.isRotating = false;
+    touchState.current.isScaling = false;
+  };
+
   return (
     <group ref={groupRef} position={position} rotation={rotation} scale={scale}>
       <primitive
@@ -95,6 +182,9 @@ function ARModel({
         onPointerOut={(e: any) => {
           document.body.style.cursor = 'default';
         }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       />
 
       {/* Selection indicator */}
@@ -135,9 +225,7 @@ export default function ARWorldViewer({
   const [interactionMode, setInteractionMode] = useState<
     'place' | 'select' | 'transform'
   >('place');
-  const [transformMode, setTransformMode] = useState<
-    'translate' | 'rotate' | 'scale'
-  >('translate');
+  // Removed transformMode state since we're using touch gestures instead
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -579,36 +667,13 @@ export default function ARWorldViewer({
                   onSelect={() => selectModel(model.id)}
                   onDeselect={deselectModel}
                   onRefReady={ref => handleModelRefReady(model.id, ref)}
+                  onTransform={updates =>
+                    updateModelTransform(model.id, updates)
+                  }
                 />
               ))}
 
-              {/* Transform Controls for Selected Model */}
-              {selectedModelId &&
-                interactionMode === 'transform' &&
-                modelRefs.current.get(selectedModelId)?.current && (
-                  <TransformControls
-                    mode={transformMode}
-                    object={modelRefs.current.get(selectedModelId)!.current!}
-                    onObjectChange={(e: any) => {
-                      if (e?.target?.object) {
-                        const obj = e.target.object;
-                        updateModelTransform(selectedModelId, {
-                          position: [
-                            obj.position.x,
-                            obj.position.y,
-                            obj.position.z
-                          ],
-                          rotation: [
-                            obj.rotation.x,
-                            obj.rotation.y,
-                            obj.rotation.z
-                          ],
-                          scale: obj.scale.x
-                        });
-                      }
-                    }}
-                  />
-                )}
+              {/* Touch gesture controls are now handled directly on the models */}
 
               {/* Debug Grid to help visualize 3D space */}
               <gridHelper args={[10, 10, 0x444444, 0x888888]} />
@@ -780,34 +845,24 @@ export default function ARWorldViewer({
         </div>
       )}
 
-      {/* Transform Mode Controls - Positioned below interaction mode controls in top right */}
+      {/* Touch Gesture Instructions - Shows when in transform mode */}
       {cameraActive && interactionMode === 'transform' && selectedModelId && (
         <div className="fixed top-24 right-4 z-[9997]">
-          <div className="flex gap-2 bg-background/95 backdrop-blur-md rounded-xl p-3 shadow-xl border-2 border-blue-500/20">
-            <Button
-              size="sm"
-              variant={transformMode === 'translate' ? 'default' : 'outline'}
-              onClick={() => setTransformMode('translate')}
-              className="gap-1 text-sm px-3 py-2 min-w-[70px]">
-              <Move className="h-4 w-4" />
-              Move
-            </Button>
-            <Button
-              size="sm"
-              variant={transformMode === 'rotate' ? 'default' : 'outline'}
-              onClick={() => setTransformMode('rotate')}
-              className="gap-1 text-sm px-3 py-2 min-w-[70px]">
-              <RotateIcon className="h-4 w-3" />
-              Rotate
-            </Button>
-            <Button
-              size="sm"
-              variant={transformMode === 'scale' ? 'default' : 'outline'}
-              onClick={() => setTransformMode('scale')}
-              className="gap-1 text-sm px-3 py-2 min-w-[70px]">
-              <ZoomIn className="h-4 w-4" />
-              Scale
-            </Button>
+          <div className="bg-background/95 backdrop-blur-md rounded-xl p-3 shadow-xl border-2 border-blue-500/20 max-w-[200px]">
+            <div className="text-center text-sm font-medium text-blue-600 mb-2">
+              Touch Gestures
+            </div>
+            <div className="text-xs space-y-1 text-muted-foreground">
+              <div>
+                • <strong>One finger:</strong> Move model
+              </div>
+              <div>
+                • <strong>Two fingers:</strong> Rotate model
+              </div>
+              <div>
+                • <strong>Pinch:</strong> Scale model
+              </div>
+            </div>
           </div>
         </div>
       )}
