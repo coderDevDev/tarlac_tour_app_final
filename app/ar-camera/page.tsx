@@ -158,40 +158,95 @@ function ARCameraContent() {
       videoRef.current.srcObject = null; // Clear any existing source
       videoRef.current.srcObject = stream;
 
-      // Wait for video to be ready
+      // Wait for video to be ready with better error handling
       await new Promise<void>((resolve, reject) => {
         if (!videoRef.current) {
           reject(new Error('Video element lost during setup'));
           return;
         }
 
-        videoRef.current.onloadedmetadata = () => {
-          console.log('Video metadata loaded, playing video');
-          if (videoRef.current) {
-            videoRef.current
-              .play()
-              .then(() => {
-                console.log('Video playing successfully');
-                // Start scanning for QR codes only after video is playing
-                startQrScanning();
-                resolve();
-              })
-              .catch(err => {
-                console.error('Error playing video:', err);
-                reject(
-                  new Error(`Error displaying camera feed: ${err.message}`)
-                );
-              });
-          } else {
-            reject(new Error('Video element lost during playback'));
+        const video = videoRef.current;
+        let resolved = false;
+
+        const onCanPlay = () => {
+          if (resolved) return;
+          resolved = true;
+          console.log('Video can play, attempting to play...');
+
+          video
+            .play()
+            .then(() => {
+              console.log('Video playing successfully');
+              resolve();
+            })
+            .catch(err => {
+              console.error('Error playing video:', err);
+              // Don't reject - video might still work for scanning
+              console.log('Video play failed but continuing...');
+              resolve();
+            });
+        };
+
+        const onLoadedMetadata = () => {
+          console.log(
+            'Video metadata loaded, dimensions:',
+            video.videoWidth,
+            'x',
+            video.videoHeight
+          );
+          if (video.videoWidth > 0 && video.videoHeight > 0) {
+            onCanPlay();
           }
         };
 
-        // Add timeout for metadata loading
-        setTimeout(() => {
-          reject(new Error('Video metadata loading timeout'));
-        }, 5000);
+        const onCanPlayThrough = () => {
+          if (!resolved) {
+            onCanPlay();
+          }
+        };
+
+        // Multiple event listeners for better compatibility
+        video.addEventListener('canplay', onCanPlay);
+        video.addEventListener('loadedmetadata', onLoadedMetadata);
+        video.addEventListener('canplaythrough', onCanPlayThrough);
+
+        // Add timeout for video setup
+        const timeout = setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            console.warn('Video setup timeout, but continuing...');
+            resolve();
+          }
+        }, 8000);
+
+        // Cleanup function
+        const cleanup = () => {
+          clearTimeout(timeout);
+          video.removeEventListener('canplay', onCanPlay);
+          video.removeEventListener('loadedmetadata', onLoadedMetadata);
+          video.removeEventListener('canplaythrough', onCanPlayThrough);
+        };
+
+        // Cleanup on resolve/reject
+        const originalResolve = resolve;
+        const originalReject = reject;
+
+        resolve = () => {
+          cleanup();
+          originalResolve();
+        };
+
+        reject = (error: any) => {
+          cleanup();
+          originalReject(error);
+        };
       });
+
+      // Start QR scanning after camera is ready
+      console.log('Camera ready, starting QR scanning...');
+      setTimeout(() => {
+        startQrScanning();
+      }, 1000); // Small delay to ensure video is stable
 
       setCameraPermission('granted');
       setCameraActive(true);
@@ -310,12 +365,46 @@ function ARCameraContent() {
     fileInputRef.current?.click();
   };
 
-  // Start QR scanning
+  // Start QR scanning with better camera availability checks
   const startQrScanning = async () => {
     setScanning(true);
     setError(null);
 
     try {
+      // Check if camera is actually available
+      if (!videoRef.current || !canvasRef.current) {
+        throw new Error('Camera elements not ready');
+      }
+
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+
+      // Wait for video to be ready
+      if (video.readyState < video.HAVE_METADATA) {
+        console.log('Waiting for video to be ready...');
+        await new Promise<void>(resolve => {
+          const checkReady = () => {
+            if (video.readyState >= video.HAVE_METADATA) {
+              resolve();
+            } else {
+              setTimeout(checkReady, 100);
+            }
+          };
+          checkReady();
+        });
+      }
+
+      // Check video dimensions
+      if (!video.videoWidth || !video.videoHeight) {
+        throw new Error('Video dimensions not available');
+      }
+
+      console.log('Video ready for scanning:', {
+        width: video.videoWidth,
+        height: video.videoHeight,
+        readyState: video.readyState
+      });
+
       // Dynamically import jsQR
       const jsQRModule = await import('jsqr');
       const jsQR = jsQRModule.default;
@@ -326,58 +415,83 @@ function ARCameraContent() {
         clearInterval(window.qrScanInterval);
       }
 
-      // Create a scanning interval
+      // Create a scanning interval with better error handling
       window.qrScanInterval = setInterval(() => {
-        if (videoRef.current && canvasRef.current) {
-          const canvas = canvasRef.current;
-          const video = videoRef.current;
+        try {
+          if (!videoRef.current || !canvasRef.current) {
+            console.warn('Video or canvas refs lost during scanning');
+            return;
+          }
 
-          if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            // Set canvas dimensions to match video
-            const videoWidth = video.videoWidth;
-            const videoHeight = video.videoHeight;
+          const currentVideo = videoRef.current;
+          const currentCanvas = canvasRef.current;
 
-            if (videoWidth && videoHeight) {
-              canvas.width = videoWidth;
-              canvas.height = videoHeight;
+          // Check if video is still valid
+          if (currentVideo.readyState < currentVideo.HAVE_ENOUGH_DATA) {
+            return; // Skip this frame
+          }
 
-              // Draw video frame to canvas
-              const ctx = canvas.getContext('2d');
-              if (ctx) {
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          // Check if dimensions are still valid
+          if (!currentVideo.videoWidth || !currentVideo.videoHeight) {
+            console.warn('Video dimensions lost during scanning');
+            return;
+          }
 
-                // Get image data for QR code detection
-                const imageData = ctx.getImageData(
-                  0,
-                  0,
-                  canvas.width,
-                  canvas.height
-                );
+          // Set canvas dimensions to match video
+          currentCanvas.width = currentVideo.videoWidth;
+          currentCanvas.height = currentVideo.videoHeight;
 
-                // Detect QR code
-                const code = jsQR(
-                  imageData.data,
-                  imageData.width,
-                  imageData.height,
-                  {
-                    inversionAttempts: 'dontInvert'
-                  }
-                );
+          // Draw video frame to canvas
+          const ctx = currentCanvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(
+              currentVideo,
+              0,
+              0,
+              currentCanvas.width,
+              currentCanvas.height
+            );
 
-                if (code) {
-                  console.log('QR code detected:', code.data);
-                  // Process the QR code
-                  processQrCode(code.data);
-                }
+            // Get image data for QR code detection
+            const imageData = ctx.getImageData(
+              0,
+              0,
+              currentCanvas.width,
+              currentCanvas.height
+            );
+
+            // Detect QR code
+            const code = jsQR(
+              imageData.data,
+              imageData.width,
+              imageData.height,
+              {
+                inversionAttempts: 'dontInvert'
               }
+            );
+
+            if (code) {
+              console.log('QR code detected:', code.data);
+              // Stop scanning and process the QR code
+              if (window.qrScanInterval) {
+                clearInterval(window.qrScanInterval);
+                window.qrScanInterval = null;
+              }
+              setScanning(false);
+              processQrCode(code.data);
             }
           }
+        } catch (scanError) {
+          console.error('Error during QR scanning:', scanError);
+          // Don't stop scanning for individual frame errors
         }
-      }, 200); // Scan every 200ms
-    } catch (err) {
+      }, 300); // Scan every 300ms for better performance
+
+      console.log('QR scanning started successfully');
+    } catch (err: any) {
       console.error('Error starting QR scanning:', err);
       setError(
-        'Failed to initialize QR scanner. Please try uploading an image instead.'
+        `Failed to initialize QR scanner: ${err.message}. Please try uploading an image instead.`
       );
       setScanning(false);
     }
@@ -522,6 +636,64 @@ function ARCameraContent() {
           autoPlay
         />
         <canvas ref={canvasRef} className="hidden" />
+      </div>
+
+      {/* Camera Status Indicator */}
+      <div className="max-w-md mx-auto mb-6">
+        <div className="bg-background/80 backdrop-blur-sm rounded-lg p-4 border shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium">Camera Status</span>
+            <div
+              className={`w-3 h-3 rounded-full ${
+                cameraActive && streamRef.current
+                  ? 'bg-green-500 animate-pulse'
+                  : cameraActive
+                  ? 'bg-yellow-500 animate-pulse'
+                  : 'bg-gray-400'
+              }`}></div>
+          </div>
+          <div className="text-xs space-y-1">
+            <div className="flex justify-between">
+              <span>Permission:</span>
+              <span
+                className={`${
+                  cameraPermission === 'granted'
+                    ? 'text-green-600'
+                    : cameraPermission === 'denied'
+                    ? 'text-red-600'
+                    : 'text-yellow-600'
+                }`}>
+                {cameraPermission === 'granted'
+                  ? '✓ Granted'
+                  : cameraPermission === 'denied'
+                  ? '✗ Denied'
+                  : '? Prompt'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Camera:</span>
+              <span
+                className={cameraActive ? 'text-green-600' : 'text-gray-500'}>
+                {cameraActive ? '✓ Active' : '✗ Inactive'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Stream:</span>
+              <span
+                className={
+                  streamRef.current ? 'text-green-600' : 'text-gray-500'
+                }>
+                {streamRef.current ? '✓ Available' : '✗ Not Available'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Scanning:</span>
+              <span className={scanning ? 'text-green-600' : 'text-gray-500'}>
+                {scanning ? '✓ Active' : '✗ Inactive'}
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <AnimatePresence mode="wait">
