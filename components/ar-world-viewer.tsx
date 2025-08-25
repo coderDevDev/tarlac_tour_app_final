@@ -108,9 +108,8 @@ function ARModel({
 
     console.log('Touch start on model:', { touches: event.touches.length });
 
-    // Completely isolate touch events to prevent page zoom/rotation
+    // Isolate touch events to prevent page zoom/rotation
     event.stopPropagation();
-    event.preventDefault();
 
     const touches = event.touches;
     touchState.current.startX = touches[0].clientX;
@@ -136,9 +135,8 @@ function ARModel({
   const handleTouchMove = (event: any) => {
     if (!onTransform) return;
 
-    // Completely block all touch events to prevent page zoom/rotation
+    // Isolate touch events to prevent page zoom/rotation
     event.stopPropagation();
-    event.preventDefault();
 
     const touches = event.touches;
 
@@ -184,9 +182,8 @@ function ARModel({
   };
 
   const handleTouchEnd = (event: any) => {
-    // Completely block touch end events to prevent page zoom/rotation
+    // Isolate touch end events to prevent page zoom/rotation
     event.stopPropagation();
-    event.preventDefault();
 
     touchState.current.isDragging = false;
     touchState.current.isRotating = false;
@@ -206,15 +203,31 @@ function ARModel({
           document.body.style.cursor = 'default';
         }}
         onTouchStart={(e: any) => {
-          console.log('Model touch start:', e.touches.length, 'on model:', url);
+          console.log(
+            '🎯 MODEL TOUCH START:',
+            e.touches.length,
+            'on model:',
+            url
+          );
+          console.log(
+            'Touch coordinates:',
+            e.touches[0]?.clientX,
+            e.touches[0]?.clientY
+          );
+          console.log('Model position:', position);
           handleTouchStart(e);
         }}
         onTouchMove={(e: any) => {
-          console.log('Model touch move:', e.touches.length);
+          console.log('🎯 MODEL TOUCH MOVE:', e.touches.length);
+          console.log(
+            'Touch coordinates:',
+            e.touches[0]?.clientX,
+            e.touches[0]?.clientY
+          );
           handleTouchMove(e);
         }}
         onTouchEnd={(e: any) => {
-          console.log('Model touch end');
+          console.log('🎯 MODEL TOUCH END');
           handleTouchEnd(e);
         }}
       />
@@ -241,6 +254,13 @@ function ARModel({
       <Html center>
         <div className="bg-yellow-500 text-black px-2 py-1 rounded text-xs font-medium opacity-50">
           Touch me!
+        </div>
+      </Html>
+
+      {/* Touch feedback indicator */}
+      <Html position={[0, 1, 0]}>
+        <div className="bg-green-500 text-white px-2 py-1 rounded text-xs font-medium">
+          Ready for touch
         </div>
       </Html>
     </group>
@@ -691,9 +711,14 @@ export default function ARWorldViewer({
           )}
 
           {/* 3D Models Overlay */}
-          <div className="absolute inset-0 z-50">
+          <div className="absolute inset-0 z-70">
             <Canvas
-              style={{ width: '100%', height: '100%' }}
+              style={{
+                width: '100%',
+                height: '100%',
+                touchAction: 'none',
+                userSelect: 'none'
+              }}
               camera={{ position: [0, 0, 5], fov: 75 }}
               gl={{
                 alpha: true,
@@ -702,17 +727,17 @@ export default function ARWorldViewer({
               }}
               onTouchStart={e => {
                 console.log('Canvas touch start:', e.touches.length);
-                // Ensure touch events reach the models
+                // Allow touch events to reach models
                 e.stopPropagation();
               }}
               onTouchMove={e => {
                 console.log('Canvas touch move:', e.touches.length);
-                // Ensure touch events reach the models
+                // Allow touch events to reach models
                 e.stopPropagation();
               }}
               onTouchEnd={e => {
                 console.log('Canvas touch end');
-                // Ensure touch events reach the models
+                // Allow touch events to reach models
                 e.stopPropagation();
               }}>
               <PerspectiveCamera makeDefault position={[0, 0, 5]} fov={75} />
@@ -1200,24 +1225,114 @@ export default function ARWorldViewer({
 
       {/* Removed touch isolation layer that was blocking model touches */}
 
-      {/* Touch Event Priority Layer - Ensures 3D models get touch events first */}
+      {/* Smart Touch Handler - Only blocks camera, allows model touches */}
       {cameraActive && (
         <div
-          className="absolute inset-0 z-45"
-          style={{ pointerEvents: 'auto' }}
+          className="absolute inset-0 z-60"
+          style={{
+            pointerEvents: 'auto',
+            touchAction: 'none',
+            userSelect: 'none'
+          }}
           onTouchStart={e => {
-            console.log('Priority layer touch start:', e.touches.length);
-            // Let touch events bubble up to models
+            console.log('Smart touch handler start:', e.touches.length);
+            // Check if touch is on a 3D model
+            const touch = e.touches[0];
+            if (touch) {
+              const element = document.elementFromPoint(
+                touch.clientX,
+                touch.clientY
+              );
+              if (
+                element &&
+                (element.closest('canvas') || element.tagName === 'CANVAS')
+              ) {
+                // Touch is on canvas/3D model, allow it
+                console.log('Touch on 3D model, allowing interaction');
+                return; // Don't block
+              } else {
+                // Touch is on camera, block it
+                console.log('Touch on camera, blocking interference');
+                e.stopPropagation();
+                e.preventDefault();
+              }
+            }
           }}
           onTouchMove={e => {
-            console.log('Priority layer touch move:', e.touches.length);
-            // Let touch events bubble up to models
+            console.log('Smart touch handler move:', e.touches.length);
+            // Check if touch is on a 3D model
+            const touch = e.touches[0];
+            if (touch) {
+              const element = document.elementFromPoint(
+                touch.clientX,
+                touch.clientY
+              );
+              if (
+                element &&
+                (element.closest('canvas') || element.tagName === 'CANVAS')
+              ) {
+                // Touch is on canvas/3D model, allow it
+                console.log('Touch on 3D model, allowing interaction');
+                return; // Don't block
+              } else {
+                // Touch is on camera, block it
+                console.log('Touch on camera, blocking interference');
+                e.stopPropagation();
+                e.preventDefault();
+              }
+            }
           }}
           onTouchEnd={e => {
-            console.log('Priority layer touch end');
-            // Let touch events bubble up to models
+            console.log('Smart touch handler end');
+            // Check if touch was on a 3D model
+            const touch = e.changedTouches[0];
+            if (touch) {
+              const element = document.elementFromPoint(
+                touch.clientX,
+                touch.clientY
+              );
+              if (
+                element &&
+                (element.closest('canvas') || element.tagName === 'CANVAS')
+              ) {
+                // Touch was on canvas/3D model, allow it
+                console.log('Touch on 3D model, allowing interaction');
+                return; // Don't block
+              } else {
+                // Touch was on camera, block it
+                console.log('Touch on camera, blocking interference');
+                e.stopPropagation();
+                e.preventDefault();
+              }
+            }
           }}
         />
+      )}
+
+      {/* Touch Debug Overlay - Shows where touches are being captured */}
+      {cameraActive && (
+        <div className="fixed top-4 left-4 z-[9999] bg-black/80 text-white p-3 rounded-lg text-xs font-mono">
+          <div className="mb-2 font-bold">Touch Debug</div>
+          <div>Camera Active: {cameraActive ? 'Yes' : 'No'}</div>
+          <div>Models Placed: {placedModels.length}</div>
+          <div>Selected Model: {selectedModelId || 'None'}</div>
+          <div>Interaction Mode: {interactionMode}</div>
+          <div className="mt-2 text-yellow-400">
+            Touch a model to see console logs
+          </div>
+          <button
+            className="mt-2 bg-blue-500 text-white px-2 py-1 rounded text-xs"
+            onClick={() => {
+              console.log('=== TOUCH SYSTEM TEST ===');
+              console.log('Camera Active:', cameraActive);
+              console.log('Models Placed:', placedModels.length);
+              console.log('Model Refs:', modelRefs.current);
+              console.log('Canvas Element:', document.querySelector('canvas'));
+              console.log('Touch Event Support:', 'ontouchstart' in window);
+            }}>
+            Test Touch System
+          </button>
+        </div>
       )}
 
       {/* Click Handler for Model Placement */}
