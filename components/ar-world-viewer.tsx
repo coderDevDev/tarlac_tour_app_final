@@ -106,6 +106,8 @@ function ARModel({
   const handleTouchStart = (event: any) => {
     if (!onTransform) return;
 
+    console.log('Touch start on model:', { touches: event.touches.length });
+
     // Completely isolate touch events to prevent page zoom/rotation
     event.stopPropagation();
     event.preventDefault();
@@ -116,6 +118,7 @@ function ARModel({
 
     if (touches.length === 1) {
       touchState.current.isDragging = true;
+      console.log('Starting drag gesture');
     } else if (touches.length === 2) {
       touchState.current.isRotating = true;
       touchState.current.startDistance = Math.hypot(
@@ -126,6 +129,7 @@ function ARModel({
         touches[1].clientY - touches[0].clientY,
         touches[1].clientX - touches[0].clientX
       );
+      console.log('Starting rotate/scale gesture');
     }
   };
 
@@ -141,6 +145,12 @@ function ARModel({
     if (touchState.current.isDragging && touches.length === 1) {
       const deltaX = (touches[0].clientX - touchState.current.startX) * 0.01;
       const deltaY = (touches[0].clientY - touchState.current.startY) * 0.01;
+
+      console.log('Dragging model:', {
+        deltaX,
+        deltaY,
+        newPosition: [position[0] + deltaX, position[1] - deltaY, position[2]]
+      });
 
       onTransform({
         position: [position[0] + deltaX, position[1] - deltaY, position[2]]
@@ -160,6 +170,8 @@ function ARModel({
 
       const rotationDelta = currentRotation - touchState.current.startRotation;
       const scaleDelta = currentDistance / touchState.current.startDistance;
+
+      console.log('Rotating/scaling model:', { rotationDelta, scaleDelta });
 
       onTransform({
         rotation: [rotation[0], rotation[1] + rotationDelta, rotation[2]],
@@ -203,6 +215,15 @@ function ARModel({
         <Html center>
           <div className="bg-blue-500 text-white px-2 py-1 rounded text-xs font-medium">
             Selected
+          </div>
+        </Html>
+      )}
+
+      {/* Touch feedback indicator */}
+      {(touchState.current.isDragging || touchState.current.isRotating) && (
+        <Html center>
+          <div className="bg-green-500 text-white px-2 py-1 rounded text-xs font-medium animate-pulse">
+            {touchState.current.isDragging ? 'Moving...' : 'Rotating...'}
           </div>
         </Html>
       )}
@@ -558,53 +579,7 @@ export default function ARWorldViewer({
     interactionMode
   ]);
 
-  // Prevent page zoom/rotation when models are being manipulated
-  useEffect(() => {
-    if (selectedModelId) {
-      // Disable page zoom and touch gestures
-      document.body.style.touchAction = 'none';
-      document.body.style.userSelect = 'none';
-      document.body.style.overflow = 'hidden';
-
-      // Add meta viewport to prevent zooming
-      const metaViewport = document.querySelector('meta[name="viewport"]');
-      if (metaViewport) {
-        metaViewport.setAttribute(
-          'content',
-          'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'
-        );
-      }
-    } else {
-      // Re-enable normal touch behavior
-      document.body.style.touchAction = '';
-      document.body.style.userSelect = '';
-      document.body.style.overflow = '';
-
-      // Restore normal viewport
-      const metaViewport = document.querySelector('meta[name="viewport"]');
-      if (metaViewport) {
-        metaViewport.setAttribute(
-          'content',
-          'width=device-width, initial-scale=1.0'
-        );
-      }
-    }
-
-    // Cleanup function
-    return () => {
-      document.body.style.touchAction = '';
-      document.body.style.userSelect = '';
-      document.body.style.overflow = '';
-
-      const metaViewport = document.querySelector('meta[name="viewport"]');
-      if (metaViewport) {
-        metaViewport.setAttribute(
-          'content',
-          'width=device-width, initial-scale=1.0'
-        );
-      }
-    };
-  }, [selectedModelId]);
+  // Removed page zoom prevention to allow model manipulation
 
   // Cleanup camera on unmount
   useEffect(() => {
@@ -795,24 +770,7 @@ export default function ARWorldViewer({
             </div>
           </div>
 
-          {/* Model Placement Indicator */}
-          {placedModels.length > 0 && (
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
-              <div className="text-center">
-                <div className="w-32 h-32 border-2 border-green-400/50 rounded-lg relative">
-                  <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-green-400"></div>
-                  <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-green-400"></div>
-                  <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-green-400"></div>
-                  <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-green-400"></div>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-green-400 text-xs font-medium">
-                      3D Models Area
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Removed confusing green border indicator */}
 
           {/* Placement Instructions */}
           <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2 text-center">
@@ -987,6 +945,10 @@ export default function ARWorldViewer({
                     cameraActive: cameraActive,
                     cameraStream: !!cameraStream
                   });
+                  console.log('Touch system status:', {
+                    selectedModelId,
+                    interactionMode
+                  });
                 }}
                 variant="outline"
                 size="sm"
@@ -1001,6 +963,30 @@ export default function ARWorldViewer({
                 onClick={resetModels}
                 className="rounded-full bg-background/80 backdrop-blur-sm min-w-[40px] h-[40px] p-0">
                 <RotateCcw className="h-3 w-3" />
+              </Button>
+
+              <Button
+                onClick={() => {
+                  if (placedModels.length > 0) {
+                    const firstModel = placedModels[0];
+                    console.log(
+                      'Testing touch system on model:',
+                      firstModel.id
+                    );
+                    updateModelTransform(firstModel.id, {
+                      position: [
+                        firstModel.position[0] + 0.1,
+                        firstModel.position[1],
+                        firstModel.position[2]
+                      ]
+                    });
+                  }
+                }}
+                variant="outline"
+                size="sm"
+                className="gap-1 bg-purple-500/90 text-white hover:bg-purple-600 min-w-[70px] text-xs">
+                <Target className="h-3 w-3" />
+                Test Touch
               </Button>
             </div>
           </div>
@@ -1191,24 +1177,21 @@ export default function ARWorldViewer({
             userSelect: 'none' // Prevents text selection
           }}
           onTouchStart={e => {
-            // Block touches when models are being manipulated
-            if (selectedModelId) {
-              e.stopPropagation();
-              e.preventDefault();
-            } else if (interactionMode === 'place') {
+            // Only block touches in place mode, allow model touches
+            if (interactionMode === 'place') {
               e.stopPropagation();
             }
           }}
           onTouchMove={e => {
-            // Prevent all touch events during model manipulation
-            if (selectedModelId) {
+            // Only block page-level touches, allow model manipulation
+            if (interactionMode === 'place') {
               e.stopPropagation();
               e.preventDefault();
             }
           }}
           onTouchEnd={e => {
-            // Block touch end events during model manipulation
-            if (selectedModelId) {
+            // Only block page-level touches
+            if (interactionMode === 'place') {
               e.stopPropagation();
               e.preventDefault();
             }
