@@ -691,7 +691,7 @@ export default function ARWorldViewer({
           )}
 
           {/* 3D Models Overlay */}
-          <div className="absolute inset-0 z-30">
+          <div className="absolute inset-0 z-50">
             <Canvas
               style={{ width: '100%', height: '100%' }}
               camera={{ position: [0, 0, 5], fov: 75 }}
@@ -702,15 +702,18 @@ export default function ARWorldViewer({
               }}
               onTouchStart={e => {
                 console.log('Canvas touch start:', e.touches.length);
-                // Don't prevent default to allow models to receive touches
+                // Ensure touch events reach the models
+                e.stopPropagation();
               }}
               onTouchMove={e => {
                 console.log('Canvas touch move:', e.touches.length);
-                // Don't prevent default to allow models to receive touches
+                // Ensure touch events reach the models
+                e.stopPropagation();
               }}
               onTouchEnd={e => {
                 console.log('Canvas touch end');
-                // Don't prevent default to allow models to receive touches
+                // Ensure touch events reach the models
+                e.stopPropagation();
               }}>
               <PerspectiveCamera makeDefault position={[0, 0, 5]} fov={75} />
               <ambientLight intensity={1.5} />
@@ -1195,37 +1198,24 @@ export default function ARWorldViewer({
         </div>
       )}
 
-      {/* Touch Event Isolation Layer - Prevents camera interference and page zoom/rotation */}
+      {/* Removed touch isolation layer that was blocking model touches */}
+
+      {/* Touch Event Priority Layer - Ensures 3D models get touch events first */}
       {cameraActive && (
         <div
-          className="absolute inset-0 z-10"
-          style={{
-            pointerEvents: 'none',
-            touchAction: 'none', // Prevents page zoom/rotation
-            userSelect: 'none' // Prevents text selection
-          }}
+          className="absolute inset-0 z-45"
+          style={{ pointerEvents: 'auto' }}
           onTouchStart={e => {
-            console.log('Isolation layer touch start:', e.touches.length);
-            // Only block touches in place mode, allow model touches
-            if (interactionMode === 'place') {
-              e.stopPropagation();
-            }
+            console.log('Priority layer touch start:', e.touches.length);
+            // Let touch events bubble up to models
           }}
           onTouchMove={e => {
-            console.log('Isolation layer touch move:', e.touches.length);
-            // Only block page-level touches, allow model manipulation
-            if (interactionMode === 'place') {
-              e.stopPropagation();
-              e.preventDefault();
-            }
+            console.log('Priority layer touch move:', e.touches.length);
+            // Let touch events bubble up to models
           }}
           onTouchEnd={e => {
-            console.log('Isolation layer touch end');
-            // Only block page-level touches
-            if (interactionMode === 'place') {
-              e.stopPropagation();
-              e.preventDefault();
-            }
+            console.log('Priority layer touch end');
+            // Let touch events bubble up to models
           }}
         />
       )}
