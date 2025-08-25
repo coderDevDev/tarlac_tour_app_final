@@ -36,26 +36,36 @@ function ARCameraContent() {
   const site = siteId ? getSiteById(siteId) : null;
   const validSiteIds = getAllSiteIds();
 
-  // Check camera permissions
+  // Check camera permissions - enhanced for WebView compatibility
   useEffect(() => {
     const checkPermissions = async () => {
       try {
+        console.log('Checking camera permissions...');
+
         // Check if the browser supports the permissions API
         if (navigator.permissions && navigator.permissions.query) {
           const result = await navigator.permissions.query({
             name: 'camera' as PermissionName
           });
+
+          console.log('Permission query result:', result.state);
           setCameraPermission(result.state as 'granted' | 'denied' | 'prompt');
 
           // Listen for permission changes
           result.onchange = () => {
+            console.log('Permission state changed to:', result.state);
             setCameraPermission(
               result.state as 'granted' | 'denied' | 'prompt'
             );
           };
+        } else {
+          console.log('Permissions API not supported, will request on demand');
+          setCameraPermission('prompt');
         }
       } catch (err) {
         console.error('Error checking camera permissions:', err);
+        // Fallback to prompt state if permission check fails
+        setCameraPermission('prompt');
       }
     };
 
@@ -209,7 +219,7 @@ function ARCameraContent() {
     setScanning(false);
   };
 
-  // Request camera permission
+  // Request camera permission - more compatible with WebView
   const requestCameraPermission = async () => {
     setError(null);
     setIsLoading(true);
@@ -219,27 +229,56 @@ function ARCameraContent() {
         throw new Error('Camera not supported in this browser');
       }
 
-      // Request camera access
+      console.log('Requesting camera permission...');
+
+      // Request camera access with explicit constraints for better WebView compatibility
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
+        video: {
+          facingMode: 'environment',
+          width: { ideal: 1280, max: 1920, min: 640 },
+          height: { ideal: 720, max: 1080, min: 480 }
+        },
         audio: false
       });
 
-      // Stop the stream immediately after getting permission
-      stream.getTracks().forEach(track => track.stop());
+      console.log('Camera permission granted, stream obtained:', stream);
+
+      // Stop the test stream immediately
+      stream.getTracks().forEach(track => {
+        console.log('Stopping test track:', track);
+        track.stop();
+      });
 
       setCameraPermission('granted');
 
-      // Set camera active immediately since video element is always available
+      // Now start the actual camera with proper setup
+      console.log('Permission granted, starting actual camera...');
       setCameraActive(true);
     } catch (err: any) {
       console.error('Error requesting camera permission:', err);
-      setError(
-        err.message === 'Permission denied'
-          ? 'Camera access was denied. Please allow camera access and try again.'
-          : `Failed to get camera permission: ${err.message}`
-      );
-      setCameraPermission('denied');
+
+      if (
+        err.name === 'NotAllowedError' ||
+        err.message.includes('Permission denied')
+      ) {
+        setError(
+          'Camera access was denied. Please allow camera access in your device settings and try again.'
+        );
+        setCameraPermission('denied');
+      } else if (
+        err.name === 'NotFoundError' ||
+        err.message.includes('no camera')
+      ) {
+        setError(
+          'No camera found on this device. Please check your camera hardware.'
+        );
+      } else if (err.name === 'NotReadableError') {
+        setError(
+          'Camera is in use by another application. Please close other camera apps and try again.'
+        );
+      } else {
+        setError(`Failed to get camera permission: ${err.message || err.name}`);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -388,6 +427,8 @@ function ARCameraContent() {
     try {
       // Check if it's a valid site ID
       const siteId = qrData.trim();
+
+      console.log({ siteId });
       if (validSiteIds.includes(siteId)) {
         console.log('Valid site ID found, navigating to AR viewer');
         router.push(`/ar-world?siteId=${siteId}`);
@@ -486,6 +527,25 @@ function ARCameraContent() {
                 </div>
 
                 <div className="flex flex-col w-full gap-3">
+                  {/* Permission Status Display */}
+                  <div className="text-xs text-center p-2 rounded-lg bg-muted/50">
+                    <span className="font-medium">Camera Permission: </span>
+                    <span
+                      className={`${
+                        cameraPermission === 'granted'
+                          ? 'text-green-600'
+                          : cameraPermission === 'denied'
+                          ? 'text-red-600'
+                          : 'text-yellow-600'
+                      }`}>
+                      {cameraPermission === 'granted'
+                        ? '✓ Granted'
+                        : cameraPermission === 'denied'
+                        ? '✗ Denied'
+                        : '? Prompt'}
+                    </span>
+                  </div>
+
                   <Button
                     onClick={requestCameraPermission}
                     className="w-full rounded-full"
@@ -493,12 +553,14 @@ function ARCameraContent() {
                     {isLoading ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Starting Camera...
+                        Requesting Permission...
                       </>
                     ) : (
                       <>
                         <Camera className="mr-2 h-4 w-4" />
-                        Scan QR Code with Camera
+                        {cameraPermission === 'granted'
+                          ? 'Start Camera'
+                          : 'Request Camera Permission'}
                       </>
                     )}
                   </Button>
@@ -562,6 +624,31 @@ function ARCameraContent() {
                     settings to allow camera access.
                   </div>
                 )}
+
+                {/* Debug Information */}
+                <details className="w-full">
+                  <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                    Debug Info
+                  </summary>
+                  <div className="text-xs text-left mt-2 p-2 bg-muted/30 rounded space-y-1">
+                    <div>
+                      User Agent: {navigator.userAgent.substring(0, 50)}...
+                    </div>
+                    <div>
+                      HTTPS: {location.protocol === 'https:' ? 'Yes' : 'No'}
+                    </div>
+                    <div>
+                      MediaDevices:{' '}
+                      {navigator.mediaDevices ? 'Supported' : 'Not Supported'}
+                    </div>
+                    <div>
+                      Permissions API:{' '}
+                      {navigator.permissions ? 'Supported' : 'Not Supported'}
+                    </div>
+                    <div>Camera Permission: {cameraPermission}</div>
+                    <div>Camera Active: {cameraActive ? 'Yes' : 'No'}</div>
+                  </div>
+                </details>
               </CardContent>
             </Card>
           </motion.div>
