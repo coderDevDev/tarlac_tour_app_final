@@ -75,11 +75,28 @@ function ARCameraContent() {
     }
   }, [cameraPermission, cameraActive]);
 
-  // Handle camera activation
+  // Debug: Log when video ref becomes available
   useEffect(() => {
-    if (cameraActive) {
-      startCamera();
-    } else {
+    if (videoRef.current) {
+      console.log('Video ref is now available:', videoRef.current);
+    }
+  }, [videoRef.current]);
+
+  // Handle camera activation - only start camera after video element is ready
+  useEffect(() => {
+    console.log('Camera activation effect:', {
+      cameraActive,
+      videoRef: !!videoRef.current
+    });
+
+    if (cameraActive && videoRef.current) {
+      // Add a small delay to ensure video element is fully rendered
+      const timer = setTimeout(() => {
+        console.log('Starting camera after delay...');
+        startCamera();
+      }, 100);
+      return () => clearTimeout(timer);
+    } else if (!cameraActive) {
       stopCamera();
     }
 
@@ -120,10 +137,34 @@ function ARCameraContent() {
       // Store the stream reference for cleanup
       streamRef.current = stream;
 
-      // Make sure the video element exists before setting its source
-      if (videoRef.current) {
-        videoRef.current.srcObject = null; // Clear any existing source
-        videoRef.current.srcObject = stream;
+      // Wait for video element to be available with retry logic
+      let attempts = 0;
+      const maxAttempts = 10;
+
+      while (!videoRef.current && attempts < maxAttempts) {
+        console.log(`Waiting for video element... attempt ${attempts + 1}`);
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+      }
+
+      if (!videoRef.current) {
+        console.error('Video element still not available after retries');
+        throw new Error('Video element not available. Please try again.');
+      }
+
+      console.log('Video element found, setting up stream');
+
+      // Set up video element
+      videoRef.current.srcObject = null; // Clear any existing source
+      videoRef.current.srcObject = stream;
+
+      // Wait for video to be ready
+      await new Promise<void>((resolve, reject) => {
+        if (!videoRef.current) {
+          reject(new Error('Video element lost during setup'));
+          return;
+        }
+
         videoRef.current.onloadedmetadata = () => {
           console.log('Video metadata loaded, playing video');
           if (videoRef.current) {
@@ -133,19 +174,27 @@ function ARCameraContent() {
                 console.log('Video playing successfully');
                 // Start scanning for QR codes only after video is playing
                 startQrScanning();
+                resolve();
               })
               .catch(err => {
                 console.error('Error playing video:', err);
-                setError(`Error displaying camera feed: ${err.message}`);
+                reject(
+                  new Error(`Error displaying camera feed: ${err.message}`)
+                );
               });
+          } else {
+            reject(new Error('Video element lost during playback'));
           }
         };
-      } else {
-        console.error('Video element not found');
-        throw new Error('Video element not found');
-      }
+
+        // Add timeout for metadata loading
+        setTimeout(() => {
+          reject(new Error('Video metadata loading timeout'));
+        }, 5000);
+      });
 
       setCameraPermission('granted');
+      setCameraActive(true);
     } catch (err: any) {
       console.error('Error starting camera:', err);
       setError(
@@ -154,6 +203,7 @@ function ARCameraContent() {
           : `Failed to start camera: ${err.message}`
       );
       setCameraPermission('denied');
+      setCameraActive(false);
     } finally {
       setIsLoading(false);
     }
@@ -189,7 +239,11 @@ function ARCameraContent() {
       stream.getTracks().forEach(track => track.stop());
 
       setCameraPermission('granted');
-      setCameraActive(true);
+
+      // Set camera active after a small delay to ensure video element is rendered
+      setTimeout(() => {
+        setCameraActive(true);
+      }, 200);
     } catch (err: any) {
       console.error('Error requesting camera permission:', err);
       setError(
@@ -348,7 +402,7 @@ function ARCameraContent() {
       const siteId = qrData.trim();
       if (validSiteIds.includes(siteId)) {
         console.log('Valid site ID found, navigating to AR viewer');
-        router.push(`/ar-camera?siteId=${siteId}`);
+        router.push(`/ar-world?siteId=${siteId}`);
       } else {
         setError(`Invalid site ID: ${siteId}. Please scan a valid QR code.`);
       }
@@ -436,8 +490,17 @@ function ARCameraContent() {
                     onClick={requestCameraPermission}
                     className="w-full rounded-full"
                     disabled={isLoading}>
-                    <Camera className="mr-2 h-4 w-4" />
-                    Scan QR Code with Camera
+                    {isLoading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Starting Camera...
+                      </>
+                    ) : (
+                      <>
+                        <Camera className="mr-2 h-4 w-4" />
+                        Scan QR Code with Camera
+                      </>
+                    )}
                   </Button>
 
                   <Button
@@ -561,7 +624,18 @@ function ARCameraContent() {
 
             {error && (
               <div className="mt-4 text-sm text-red-500 text-center px-4 py-2 bg-red-50 rounded-md">
-                {error}
+                <p className="mb-2">{error}</p>
+                <Button
+                  onClick={() => {
+                    setError(null);
+                    setCameraActive(false);
+                    setTimeout(() => setCameraActive(true), 100);
+                  }}
+                  variant="outline"
+                  size="sm"
+                  className="mt-2">
+                  Retry Camera
+                </Button>
               </div>
             )}
           </motion.div>

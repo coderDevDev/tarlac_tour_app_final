@@ -35,7 +35,7 @@ function ARWorldContent() {
       {/* Header */}
       <div className="absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-background/90 to-transparent p-4">
         <div className="flex items-center gap-3">
-          <Link href={`/ar-camera?siteId=${siteId}`}>
+          <Link href={`/ar-world?siteId=${siteId}`}>
             <Button variant="ghost" size="icon" className="rounded-full">
               <ArrowLeft className="h-4 w-4" />
             </Button>

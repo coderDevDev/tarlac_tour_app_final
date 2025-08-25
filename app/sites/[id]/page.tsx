@@ -1,36 +1,44 @@
-"use client"
+'use client';
 
-import { getSiteById } from "@/lib/data"
-import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent } from "@/components/ui/card"
-import { MapPin, History, Camera, Map, ArrowLeft, Share2, QrCode } from "lucide-react"
-import Link from "next/link"
-import Image from "next/image"
-import { notFound, useParams } from "next/navigation"
-import { useEffect, useState } from "react"
-import SiteGallery from "@/components/site-gallery"
-import SiteMap from "@/components/site-map"
-import { motion, AnimatePresence } from "framer-motion"
-import { Badge } from "@/components/ui/badge"
-import AudioDescriptionPlayer from "@/components/audio-description-player"
-import QRCodeDisplay from "@/components/qr-code-display"
+import { getSiteById } from '@/lib/data';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  MapPin,
+  History,
+  Camera,
+  Map,
+  ArrowLeft,
+  Share2,
+  QrCode
+} from 'lucide-react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { notFound, useParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import SiteGallery from '@/components/site-gallery';
+import SiteMap from '@/components/site-map';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Badge } from '@/components/ui/badge';
+import AudioDescriptionPlayer from '@/components/audio-description-player';
+import QRCodeDisplay from '@/components/qr-code-display';
 
 export default function SitePage() {
-  const { id } = useParams()
-  const [site, setSite] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [showQRCode, setShowQRCode] = useState(false)
+  const { id } = useParams();
+  const [site, setSite] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [showQRCode, setShowQRCode] = useState(false);
 
   useEffect(() => {
     if (id) {
-      const siteData = getSiteById(id.toString())
+      const siteData = getSiteById(id.toString());
       if (siteData) {
-        setSite(siteData)
+        setSite(siteData);
       }
-      setLoading(false)
+      setLoading(false);
     }
-  }, [id])
+  }, [id]);
 
   if (loading) {
     return (
@@ -51,21 +59,26 @@ export default function SitePage() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   if (!site) {
-    notFound()
+    notFound();
   }
 
   const toggleQRCode = () => {
-    setShowQRCode(!showQRCode)
-  }
+    setShowQRCode(!showQRCode);
+  };
 
   return (
     <div className="container px-4 py-8">
-      <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3 }}>
-        <Link href="/sites" className="inline-flex items-center text-muted-foreground hover:text-primary mb-6 group">
+      <motion.div
+        initial={{ opacity: 0, x: -10 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.3 }}>
+        <Link
+          href="/sites"
+          className="inline-flex items-center text-muted-foreground hover:text-primary mb-6 group">
           <ArrowLeft className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-1" />
           Back to all sites
         </Link>
@@ -76,17 +89,21 @@ export default function SitePage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="relative h-64 sm:h-80 lg:h-full rounded-2xl overflow-hidden shadow-xl"
-        >
-          <Image src={site.images[0] || "/placeholder.svg"} alt={site.name} fill className="object-cover" priority />
+          className="relative h-64 sm:h-80 lg:h-full rounded-2xl overflow-hidden shadow-xl">
+          <Image
+            src={site.images[0] || '/placeholder.svg'}
+            alt={site.name}
+            fill
+            className="object-cover"
+            priority
+          />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
         </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-        >
+          transition={{ duration: 0.5, delay: 0.2 }}>
           <Badge className="mb-3 bg-primary/10 text-primary hover:bg-primary/20 rounded-full px-3 py-1">
             Heritage Site
           </Badge>
@@ -98,12 +115,15 @@ export default function SitePage() {
 
           <p className="mb-6 text-muted-foreground">{site.fullDescription}</p>
           {site.audioDescription && (
-            <AudioDescriptionPlayer audioUrl={site.audioDescription} description={site.fullDescription} />
+            <AudioDescriptionPlayer
+              audioUrl={site.audioDescription}
+              description={site.fullDescription}
+            />
           )}
 
           <div className="flex flex-wrap gap-4 mb-8">
             <Button asChild className="rounded-full">
-              <Link href={`/ar-camera?siteId=${site.id}`}>
+              <Link href={`/ar-world?siteId=${site.id}`}>
                 <Camera className="mr-2 h-4 w-4" />
                 View in AR
               </Link>
@@ -114,11 +134,17 @@ export default function SitePage() {
                 Get Directions
               </Link>
             </Button>
-            <Button variant="outline" className="rounded-full" onClick={toggleQRCode}>
+            <Button
+              variant="outline"
+              className="rounded-full"
+              onClick={toggleQRCode}>
               <QrCode className="mr-2 h-4 w-4" />
-              {showQRCode ? "Hide QR Code" : "Show QR Code"}
+              {showQRCode ? 'Hide QR Code' : 'Show QR Code'}
             </Button>
-            <Button variant="ghost" size="icon" className="rounded-full ml-auto">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full ml-auto">
               <Share2 className="h-4 w-4" />
               <span className="sr-only">Share</span>
             </Button>
@@ -128,21 +154,23 @@ export default function SitePage() {
             {showQRCode && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
+                animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.3 }}
-                className="overflow-hidden"
-              >
+                className="overflow-hidden">
                 <Card className="border-none shadow-lg overflow-hidden mb-8">
                   <CardContent className="p-6">
                     <div className="flex flex-col items-center">
-                      <h3 className="text-lg font-medium mb-4">Scan to view in AR</h3>
+                      <h3 className="text-lg font-medium mb-4">
+                        Scan to view in AR
+                      </h3>
                       <QRCodeDisplay
-                        url={`${window.location.origin}/ar-camera?siteId=${site.id}`}
+                        url={`${window.location.origin}/ar-world?siteId=${site.id}`}
                         siteName={site.name}
                       />
                       <p className="text-sm text-muted-foreground mt-4 text-center">
-                        Scan this QR code with any scanner to open the AR experience for {site.name}
+                        Scan this QR code with any scanner to open the AR
+                        experience for {site.name}
                       </p>
                     </div>
                   </CardContent>
@@ -172,8 +200,7 @@ export default function SitePage() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.3 }}
-            >
+              transition={{ duration: 0.3 }}>
               <Card className="border-none shadow-lg overflow-hidden">
                 <CardContent className="p-6">
                   <div className="flex items-center gap-2 mb-4">
@@ -193,8 +220,7 @@ export default function SitePage() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.3 }}
-            >
+              transition={{ duration: 0.3 }}>
               <Card className="border-none shadow-lg overflow-hidden">
                 <CardContent className="p-6">
                   <SiteGallery images={site.images} videos={site.videos} />
@@ -208,8 +234,7 @@ export default function SitePage() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.3 }}
-            >
+              transition={{ duration: 0.3 }}>
               <Card className="border-none shadow-lg overflow-hidden">
                 <CardContent className="p-6">
                   <div className="h-[400px] rounded-xl overflow-hidden">
@@ -222,5 +247,5 @@ export default function SitePage() {
         </AnimatePresence>
       </Tabs>
     </div>
-  )
+  );
 }

@@ -746,7 +746,7 @@ export default function ARWorldViewer({
           {/* Removed confusing green border indicator */}
 
           {/* Touch Instructions */}
-          <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2 text-center">
+          {/* <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2 text-center">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -755,7 +755,7 @@ export default function ARWorldViewer({
                 Touch the 3D model to interact with it
               </p>
             </motion.div>
-          </div>
+          </div> */}
         </div>
       ) : (
         /* 3D Model Preview when camera is off */
