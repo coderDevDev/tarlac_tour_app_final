@@ -71,6 +71,9 @@ function ARModel({
     isScaling: false
   });
 
+  // Touch feedback state
+  const [isBeingTouched, setIsBeingTouched] = useState(false);
+
   useEffect(() => {
     // Play the first animation if available
     if (animations.length > 0 && actions) {
@@ -110,6 +113,9 @@ function ARModel({
 
     // Isolate touch events to prevent page zoom/rotation
     event.stopPropagation();
+
+    // Set touch feedback state
+    setIsBeingTouched(true);
 
     const touches = event.touches;
     touchState.current.startX = touches[0].clientX;
@@ -185,6 +191,9 @@ function ARModel({
     // Isolate touch end events to prevent page zoom/rotation
     event.stopPropagation();
 
+    // Clear touch feedback state
+    setIsBeingTouched(false);
+
     touchState.current.isDragging = false;
     touchState.current.isRotating = false;
     touchState.current.isScaling = false;
@@ -259,8 +268,13 @@ function ARModel({
 
       {/* Touch feedback indicator */}
       <Html position={[0, 1, 0]}>
-        <div className="bg-green-500 text-white px-2 py-1 rounded text-xs font-medium">
-          Ready for touch
+        <div
+          className={`px-2 py-1 rounded text-xs font-medium ${
+            isBeingTouched
+              ? 'bg-red-500 text-white animate-pulse'
+              : 'bg-green-500 text-white'
+          }`}>
+          {isBeingTouched ? 'Touch Active!' : 'Ready for touch'}
         </div>
       </Html>
     </group>
@@ -682,7 +696,10 @@ export default function ARWorldViewer({
             webkit-playsinline="true"
             style={{
               transform: 'scaleX(-1)', // Mirror the camera for better UX
-              objectFit: 'cover'
+              objectFit: 'cover',
+              pointerEvents: 'none', // Prevent video from capturing touch events
+              touchAction: 'none', // Prevent touch actions on video
+              userSelect: 'none' // Prevent text selection
             }}
           />
 
@@ -711,7 +728,7 @@ export default function ARWorldViewer({
           )}
 
           {/* 3D Models Overlay */}
-          <div className="absolute inset-0 z-70">
+          <div className="absolute inset-0 z-80">
             <Canvas
               style={{
                 width: '100%',
@@ -1225,89 +1242,7 @@ export default function ARWorldViewer({
 
       {/* Removed touch isolation layer that was blocking model touches */}
 
-      {/* Smart Touch Handler - Only blocks camera, allows model touches */}
-      {cameraActive && (
-        <div
-          className="absolute inset-0 z-60"
-          style={{
-            pointerEvents: 'auto',
-            touchAction: 'none',
-            userSelect: 'none'
-          }}
-          onTouchStart={e => {
-            console.log('Smart touch handler start:', e.touches.length);
-            // Check if touch is on a 3D model
-            const touch = e.touches[0];
-            if (touch) {
-              const element = document.elementFromPoint(
-                touch.clientX,
-                touch.clientY
-              );
-              if (
-                element &&
-                (element.closest('canvas') || element.tagName === 'CANVAS')
-              ) {
-                // Touch is on canvas/3D model, allow it
-                console.log('Touch on 3D model, allowing interaction');
-                return; // Don't block
-              } else {
-                // Touch is on camera, block it
-                console.log('Touch on camera, blocking interference');
-                e.stopPropagation();
-                e.preventDefault();
-              }
-            }
-          }}
-          onTouchMove={e => {
-            console.log('Smart touch handler move:', e.touches.length);
-            // Check if touch is on a 3D model
-            const touch = e.touches[0];
-            if (touch) {
-              const element = document.elementFromPoint(
-                touch.clientX,
-                touch.clientY
-              );
-              if (
-                element &&
-                (element.closest('canvas') || element.tagName === 'CANVAS')
-              ) {
-                // Touch is on canvas/3D model, allow it
-                console.log('Touch on 3D model, allowing interaction');
-                return; // Don't block
-              } else {
-                // Touch is on camera, block it
-                console.log('Touch on camera, blocking interference');
-                e.stopPropagation();
-                e.preventDefault();
-              }
-            }
-          }}
-          onTouchEnd={e => {
-            console.log('Smart touch handler end');
-            // Check if touch was on a 3D model
-            const touch = e.changedTouches[0];
-            if (touch) {
-              const element = document.elementFromPoint(
-                touch.clientX,
-                touch.clientY
-              );
-              if (
-                element &&
-                (element.closest('canvas') || element.tagName === 'CANVAS')
-              ) {
-                // Touch was on canvas/3D model, allow it
-                console.log('Touch on 3D model, allowing interaction');
-                return; // Don't block
-              } else {
-                // Touch was on camera, block it
-                console.log('Touch on camera, blocking interference');
-                e.stopPropagation();
-                e.preventDefault();
-              }
-            }
-          }}
-        />
-      )}
+      {/* Removed smart touch handler - video element now has pointer-events: none */}
 
       {/* Touch Debug Overlay - Shows where touches are being captured */}
       {cameraActive && (
@@ -1329,9 +1264,19 @@ export default function ARWorldViewer({
               console.log('Model Refs:', modelRefs.current);
               console.log('Canvas Element:', document.querySelector('canvas'));
               console.log('Touch Event Support:', 'ontouchstart' in window);
+              console.log('Video Element:', videoRef.current);
+              console.log(
+                'Video pointer-events:',
+                videoRef.current?.style.pointerEvents
+              );
             }}>
             Test Touch System
           </button>
+          <div className="mt-2 text-xs">
+            <div>Video pointer-events: none</div>
+            <div>Canvas z-index: 80</div>
+            <div>Touch events should work now</div>
+          </div>
         </div>
       )}
 
