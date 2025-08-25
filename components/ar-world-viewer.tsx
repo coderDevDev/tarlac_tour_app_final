@@ -123,11 +123,11 @@ function ARModel({
       )}
 
       {/* Simple indicator that model is ready */}
-      <Html position={[0, 1, 0]}>
+      {/* <Html position={[0, 1, 0]}>
         <div className="bg-green-500 text-white px-2 py-1 rounded text-xs font-medium">
           Ready for interaction
         </div>
-      </Html>
+      </Html> */}
     </group>
   );
 }
@@ -809,7 +809,7 @@ export default function ARWorldViewer({
       </div>
 
       {/* Touch Gesture Instructions - Always visible when camera is active */}
-      {cameraActive && (
+      {/* {cameraActive && (
         <div className="fixed top-4 right-4 z-[9998]">
           <div className="bg-background/95 backdrop-blur-md rounded-xl p-3 shadow-xl border-2 border-primary/20 max-w-[200px]">
             <div className="text-center text-sm font-medium text-primary mb-2">
@@ -828,256 +828,11 @@ export default function ARWorldViewer({
             </div>
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Removed transform mode instructions since gestures work directly on models */}
 
       {/* Control Buttons Row - Responsive and Always Accessible */}
-      <div className="fixed bottom-12 left-2 right-2 sm:left-4 sm:right-4 z-[9998]">
-        {/* Mobile: Stack buttons vertically for small screens */}
-        <div className="block sm:hidden">
-          <div className="flex flex-col gap-2 items-center">
-            {/* Row 1: Camera Controls */}
-            <div className="flex gap-2 justify-center">
-              <Button
-                onClick={cameraActive ? stopCamera : startCamera}
-                variant="secondary"
-                size="sm"
-                className="gap-1 bg-white/90 text-black hover:bg-white shadow-lg min-w-[70px] text-xs">
-                {cameraActive ? (
-                  <>
-                    <X className="h-3 w-3" />
-                    Stop
-                  </>
-                ) : (
-                  <>
-                    <Camera className="h-3 w-3" />
-                    Start
-                  </>
-                )}
-              </Button>
-
-              <Button
-                onClick={() => {
-                  console.log('Retrying camera...');
-                  startCamera();
-                }}
-                variant="outline"
-                size="sm"
-                className="gap-1 bg-orange-500/90 text-white hover:bg-orange-600 min-w-[70px] text-xs">
-                <RefreshCw className="h-3 w-3" />
-                Retry
-              </Button>
-
-              <Button
-                onClick={() => {
-                  console.log('Requesting camera permission...');
-                  navigator.mediaDevices
-                    ?.getUserMedia({ video: true })
-                    .then(stream => {
-                      console.log('Permission granted, stopping test stream');
-                      stream.getTracks().forEach(track => track.stop());
-                      startCamera();
-                    })
-                    .catch(err => {
-                      console.error('Permission request failed:', err);
-                    });
-                }}
-                variant="outline"
-                size="sm"
-                className="gap-1 bg-green-500/90 text-white hover:bg-green-600 min-w-[70px] text-xs">
-                <Camera className="h-3 w-3" />
-                Permission
-              </Button>
-            </div>
-
-            {/* Row 2: Model Controls */}
-            <div className="flex gap-2 justify-center">
-              <Button
-                onClick={() => {
-                  const testModel = {
-                    id: Date.now().toString(),
-                    position: [0, 0, -1] as [number, number, number],
-                    rotation: [0, 0, 0] as [number, number, number],
-                    scale: 1.5
-                  };
-                  setPlacedModels(prev => [...prev, testModel]);
-                  console.log('Test model added at center');
-                }}
-                variant="outline"
-                size="sm"
-                className="gap-1 bg-blue-500/90 text-white hover:bg-blue-600 min-w-[70px] text-xs">
-                <Target className="h-3 w-3" />
-                Test
-              </Button>
-
-              <Button
-                onClick={() => {
-                  console.log('Video ref status:', {
-                    exists: !!videoRef.current,
-                    element: videoRef.current,
-                    tagName: videoRef.current?.tagName,
-                    readyState: videoRef.current?.readyState
-                  });
-                  console.log('3D Scene status:', {
-                    placedModels: placedModels,
-                    modelUrl: modelUrl,
-                    cameraActive: cameraActive,
-                    cameraStream: !!cameraStream
-                  });
-                  console.log('Touch system status:', {
-                    selectedModelId,
-                    interactionMode
-                  });
-                }}
-                variant="outline"
-                size="sm"
-                className="gap-1 bg-yellow-500/90 text-white hover:bg-yellow-600 min-w-[70px] text-xs">
-                <Info className="h-3 w-3" />
-                Debug
-              </Button>
-
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={resetModels}
-                className="rounded-full bg-background/80 backdrop-blur-sm min-w-[40px] h-[40px] p-0">
-                <RotateCcw className="h-3 w-3" />
-              </Button>
-
-              <Button
-                onClick={() => {
-                  if (placedModels.length > 0) {
-                    const firstModel = placedModels[0];
-                    console.log(
-                      'Testing touch system on model:',
-                      firstModel.id
-                    );
-                    updateModelTransform(firstModel.id, {
-                      position: [
-                        firstModel.position[0] + 0.1,
-                        firstModel.position[1],
-                        firstModel.position[2]
-                      ]
-                    });
-                  }
-                }}
-                variant="outline"
-                size="sm"
-                className="gap-1 bg-purple-500/90 text-white hover:bg-purple-600 min-w-[70px] text-xs">
-                <Target className="h-3 w-3" />
-                Test Touch
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Desktop: Horizontal layout for larger screens */}
-        <div className="hidden sm:flex justify-between items-center">
-          {/* Left Side - Camera Controls */}
-          <div className="flex gap-2">
-            <Button
-              onClick={cameraActive ? stopCamera : startCamera}
-              variant="secondary"
-              className="gap-2 bg-white/90 text-black hover:bg-white shadow-lg min-w-[80px]">
-              {cameraActive ? (
-                <>
-                  <X className="h-4 w-4" />
-                  Stop
-                </>
-              ) : (
-                <>
-                  <Camera className="h-4 w-4" />
-                  Start
-                </>
-              )}
-            </Button>
-
-            <Button
-              onClick={() => {
-                console.log('Retrying camera...');
-                startCamera();
-              }}
-              variant="outline"
-              size="sm"
-              className="gap-2 bg-orange-500/90 text-white hover:bg-orange-600 min-w-[80px]">
-              <RefreshCw className="h-4 w-4" />
-              Retry
-            </Button>
-
-            <Button
-              onClick={() => {
-                console.log('Requesting camera permission...');
-                navigator.mediaDevices
-                  ?.getUserMedia({ video: true })
-                  .then(stream => {
-                    console.log('Permission granted, stopping test stream');
-                    stream.getTracks().forEach(track => track.stop());
-                    startCamera();
-                  })
-                  .catch(err => {
-                    console.error('Permission request failed:', err);
-                  });
-              }}
-              variant="outline"
-              size="sm"
-              className="gap-2 bg-green-500/90 text-white hover:bg-green-600 min-w-[80px]">
-              <Camera className="h-4 w-4" />
-              Permission
-            </Button>
-
-            <Button
-              onClick={() => {
-                console.log('Video ref status:', {
-                  exists: !!videoRef.current,
-                  element: videoRef.current,
-                  tagName: videoRef.current?.tagName,
-                  readyState: videoRef.current?.readyState
-                });
-                console.log('3D Scene status:', {
-                  placedModels: placedModels,
-                  modelUrl: modelUrl,
-                  cameraActive: cameraActive,
-                  cameraStream: !!cameraStream
-                });
-              }}
-              variant="outline"
-              size="sm"
-              className="gap-2 bg-yellow-500/90 text-white hover:bg-yellow-600 min-w-[80px]">
-              <Info className="h-4 w-4" />
-              Debug
-            </Button>
-          </div>
-
-          {/* Right Side - Model Controls */}
-          <div className="flex gap-2">
-            <Button
-              onClick={() => {
-                const testModel = {
-                  id: Date.now().toString(),
-                  position: [0, 0, -1] as [number, number, number],
-                  rotation: [0, 0, 0] as [number, number, number],
-                  scale: 1.5
-                };
-                setPlacedModels(prev => [...prev, testModel]);
-                console.log('Test model added at center');
-              }}
-              variant="outline"
-              className="gap-2 bg-blue-500/90 text-white hover:bg-blue-600 min-w-[80px]">
-              <Target className="h-4 w-4" />
-              Test
-            </Button>
-
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={resetModels}
-              className="rounded-full bg-background/80 backdrop-blur-sm min-w-[40px] h-[40px] p-0">
-              <RotateCcw className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </div>
 
       {/* Info Button - Always Accessible */}
       <div className="fixed top-2 right-2 sm:top-4 sm:right-4 z-[9997]">
@@ -1131,7 +886,7 @@ export default function ARWorldViewer({
       {/* Removed smart touch handler - video element now has pointer-events: none */}
 
       {/* Touch Debug Overlay - Shows where touches are being captured */}
-      {cameraActive && (
+      {/* {cameraActive && (
         <div className="fixed top-4 left-4 z-[9999] bg-black/80 text-white p-3 rounded-lg text-xs font-mono">
           <div className="mb-2 font-bold">Touch Debug</div>
           <div>Camera Active: {cameraActive ? 'Yes' : 'No'}</div>
@@ -1165,7 +920,7 @@ export default function ARWorldViewer({
             <div>Touch gestures should work now!</div>
           </div>
         </div>
-      )}
+      )} */}
 
       {/* No need for model placement - using single overlay model */}
     </div>
