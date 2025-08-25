@@ -748,9 +748,9 @@ export default function ARWorldViewer({
         </Button>
       </div>
 
-      {/* Interaction Mode Controls - Repositioned to avoid overlap */}
+      {/* Interaction Mode Controls - Moved to top right for better accessibility */}
       {cameraActive && placedModels.length > 0 && (
-        <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 z-[9998]">
+        <div className="fixed top-4 right-4 z-[9998]">
           <div className="flex gap-2 bg-background/95 backdrop-blur-md rounded-xl p-3 shadow-xl border-2 border-primary/20">
             <Button
               size="sm"
@@ -780,9 +780,9 @@ export default function ARWorldViewer({
         </div>
       )}
 
-      {/* Transform Mode Controls - Repositioned to avoid overlap */}
+      {/* Transform Mode Controls - Positioned below interaction mode controls in top right */}
       {cameraActive && interactionMode === 'transform' && selectedModelId && (
-        <div className="fixed bottom-40 left-1/2 transform -translate-x-1/2 z-[9997]">
+        <div className="fixed top-24 right-4 z-[9997]">
           <div className="flex gap-2 bg-background/95 backdrop-blur-md rounded-xl p-3 shadow-xl border-2 border-blue-500/20">
             <Button
               size="sm"
