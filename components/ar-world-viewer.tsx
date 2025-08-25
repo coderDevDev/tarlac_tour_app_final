@@ -205,9 +205,18 @@ function ARModel({
         onPointerOut={(e: any) => {
           document.body.style.cursor = 'default';
         }}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+        onTouchStart={(e: any) => {
+          console.log('Model touch start:', e.touches.length, 'on model:', url);
+          handleTouchStart(e);
+        }}
+        onTouchMove={(e: any) => {
+          console.log('Model touch move:', e.touches.length);
+          handleTouchMove(e);
+        }}
+        onTouchEnd={(e: any) => {
+          console.log('Model touch end');
+          handleTouchEnd(e);
+        }}
       />
 
       {/* Selection indicator */}
@@ -227,6 +236,13 @@ function ARModel({
           </div>
         </Html>
       )}
+
+      {/* Touch detection indicator */}
+      <Html center>
+        <div className="bg-yellow-500 text-black px-2 py-1 rounded text-xs font-medium opacity-50">
+          Touch me!
+        </div>
+      </Html>
     </group>
   );
 }
@@ -675,7 +691,7 @@ export default function ARWorldViewer({
           )}
 
           {/* 3D Models Overlay */}
-          <div className="absolute inset-0 pointer-events-none z-30">
+          <div className="absolute inset-0 z-30">
             <Canvas
               style={{ width: '100%', height: '100%' }}
               camera={{ position: [0, 0, 5], fov: 75 }}
@@ -683,6 +699,18 @@ export default function ARWorldViewer({
                 alpha: true,
                 antialias: true,
                 preserveDrawingBuffer: true
+              }}
+              onTouchStart={e => {
+                console.log('Canvas touch start:', e.touches.length);
+                // Don't prevent default to allow models to receive touches
+              }}
+              onTouchMove={e => {
+                console.log('Canvas touch move:', e.touches.length);
+                // Don't prevent default to allow models to receive touches
+              }}
+              onTouchEnd={e => {
+                console.log('Canvas touch end');
+                // Don't prevent default to allow models to receive touches
               }}>
               <PerspectiveCamera makeDefault position={[0, 0, 5]} fov={75} />
               <ambientLight intensity={1.5} />
@@ -1177,12 +1205,14 @@ export default function ARWorldViewer({
             userSelect: 'none' // Prevents text selection
           }}
           onTouchStart={e => {
+            console.log('Isolation layer touch start:', e.touches.length);
             // Only block touches in place mode, allow model touches
             if (interactionMode === 'place') {
               e.stopPropagation();
             }
           }}
           onTouchMove={e => {
+            console.log('Isolation layer touch move:', e.touches.length);
             // Only block page-level touches, allow model manipulation
             if (interactionMode === 'place') {
               e.stopPropagation();
@@ -1190,6 +1220,7 @@ export default function ARWorldViewer({
             }
           }}
           onTouchEnd={e => {
+            console.log('Isolation layer touch end');
             // Only block page-level touches
             if (interactionMode === 'place') {
               e.stopPropagation();
