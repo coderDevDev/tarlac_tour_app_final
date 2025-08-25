@@ -77,26 +77,25 @@ function ARCameraContent() {
 
   // Debug: Log when video ref becomes available
   useEffect(() => {
-    if (videoRef.current) {
-      console.log('Video ref is now available:', videoRef.current);
-    }
+    console.log('Video ref status:', {
+      current: !!videoRef.current,
+      element: videoRef.current,
+      tagName: videoRef.current?.tagName
+    });
   }, [videoRef.current]);
 
-  // Handle camera activation - only start camera after video element is ready
+  // Handle camera activation - video element is always available now
   useEffect(() => {
     console.log('Camera activation effect:', {
       cameraActive,
       videoRef: !!videoRef.current
     });
 
-    if (cameraActive && videoRef.current) {
-      // Add a small delay to ensure video element is fully rendered
-      const timer = setTimeout(() => {
-        console.log('Starting camera after delay...');
-        startCamera();
-      }, 100);
-      return () => clearTimeout(timer);
-    } else if (!cameraActive) {
+    if (cameraActive) {
+      // Start camera immediately since video element is always available
+      console.log('Starting camera...');
+      startCamera();
+    } else {
       stopCamera();
     }
 
@@ -137,18 +136,9 @@ function ARCameraContent() {
       // Store the stream reference for cleanup
       streamRef.current = stream;
 
-      // Wait for video element to be available with retry logic
-      let attempts = 0;
-      const maxAttempts = 10;
-
-      while (!videoRef.current && attempts < maxAttempts) {
-        console.log(`Waiting for video element... attempt ${attempts + 1}`);
-        await new Promise(resolve => setTimeout(resolve, 100));
-        attempts++;
-      }
-
+      // Video element is always available now
       if (!videoRef.current) {
-        console.error('Video element still not available after retries');
+        console.error('Video element not available');
         throw new Error('Video element not available. Please try again.');
       }
 
@@ -240,10 +230,8 @@ function ARCameraContent() {
 
       setCameraPermission('granted');
 
-      // Set camera active after a small delay to ensure video element is rendered
-      setTimeout(() => {
-        setCameraActive(true);
-      }, 200);
+      // Set camera active immediately since video element is always available
+      setCameraActive(true);
     } catch (err: any) {
       console.error('Error requesting camera permission:', err);
       setError(
@@ -462,6 +450,18 @@ function ARCameraContent() {
         AR Experience
       </motion.h1>
 
+      {/* Always render video element but hide when not needed */}
+      <div className="hidden">
+        <video
+          ref={videoRef}
+          className="absolute inset-0 w-full h-full object-cover z-10"
+          playsInline
+          muted
+          autoPlay
+        />
+        <canvas ref={canvasRef} className="hidden" />
+      </div>
+
       <AnimatePresence mode="wait">
         {!cameraActive ? (
           <motion.div
@@ -585,6 +585,16 @@ function ARCameraContent() {
 
               {/* Canvas for QR code detection (hidden) */}
               <canvas ref={canvasRef} className="hidden" />
+
+              {/* Camera starting overlay */}
+              {isLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/70 z-30">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+                    <p className="text-white">Starting camera...</p>
+                  </div>
+                </div>
+              )}
 
               {/* Scanning overlay */}
               <div className="absolute inset-0 pointer-events-none z-20">
