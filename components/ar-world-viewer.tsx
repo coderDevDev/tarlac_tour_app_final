@@ -748,64 +748,64 @@ export default function ARWorldViewer({
         </Button>
       </div>
 
-      {/* Interaction Mode Controls */}
+      {/* Interaction Mode Controls - Repositioned to avoid overlap */}
       {cameraActive && placedModels.length > 0 && (
-        <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-[9998]">
-          <div className="flex gap-2 bg-background/90 backdrop-blur-sm rounded-lg p-2 shadow-lg border">
+        <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 z-[9998]">
+          <div className="flex gap-2 bg-background/95 backdrop-blur-md rounded-xl p-3 shadow-xl border-2 border-primary/20">
             <Button
               size="sm"
               variant={interactionMode === 'place' ? 'default' : 'outline'}
               onClick={() => setInteractionMode('place')}
-              className="gap-1 text-xs">
-              <Target className="h-3 w-3" />
+              className="gap-1 text-sm px-3 py-2 min-w-[80px]">
+              <Target className="h-4 w-4" />
               Place
             </Button>
             <Button
               size="sm"
               variant={interactionMode === 'select' ? 'default' : 'outline'}
               onClick={() => setInteractionMode('select')}
-              className="gap-1 text-xs">
-              <Hand className="h-3 w-3" />
+              className="gap-1 text-sm px-3 py-2 min-w-[80px]">
+              <Hand className="h-4 w-4" />
               Select
             </Button>
             <Button
               size="sm"
               variant={interactionMode === 'transform' ? 'default' : 'outline'}
               onClick={() => setInteractionMode('transform')}
-              className="gap-1 text-xs">
-              <Move className="h-3 w-3" />
+              className="gap-1 text-sm px-3 py-2 min-w-[80px]">
+              <Move className="h-4 w-4" />
               Transform
             </Button>
           </div>
         </div>
       )}
 
-      {/* Transform Mode Controls */}
+      {/* Transform Mode Controls - Repositioned to avoid overlap */}
       {cameraActive && interactionMode === 'transform' && selectedModelId && (
-        <div className="fixed bottom-32 left-1/2 transform -translate-x-1/2 z-[9997]">
-          <div className="flex gap-2 bg-background/90 backdrop-blur-sm rounded-lg p-2 shadow-lg border">
+        <div className="fixed bottom-40 left-1/2 transform -translate-x-1/2 z-[9997]">
+          <div className="flex gap-2 bg-background/95 backdrop-blur-md rounded-xl p-3 shadow-xl border-2 border-blue-500/20">
             <Button
               size="sm"
               variant={transformMode === 'translate' ? 'default' : 'outline'}
               onClick={() => setTransformMode('translate')}
-              className="gap-1 text-xs">
-              <Move className="h-3 w-3" />
+              className="gap-1 text-sm px-3 py-2 min-w-[70px]">
+              <Move className="h-4 w-4" />
               Move
             </Button>
             <Button
               size="sm"
               variant={transformMode === 'rotate' ? 'default' : 'outline'}
               onClick={() => setTransformMode('rotate')}
-              className="gap-1 text-xs">
-              <RotateIcon className="h-3 w-3" />
+              className="gap-1 text-sm px-3 py-2 min-w-[70px]">
+              <RotateIcon className="h-4 w-3" />
               Rotate
             </Button>
             <Button
               size="sm"
               variant={transformMode === 'scale' ? 'default' : 'outline'}
               onClick={() => setTransformMode('scale')}
-              className="gap-1 text-xs">
-              <ZoomIn className="h-3 w-3" />
+              className="gap-1 text-sm px-3 py-2 min-w-[70px]">
+              <ZoomIn className="h-4 w-4" />
               Scale
             </Button>
           </div>
@@ -813,7 +813,7 @@ export default function ARWorldViewer({
       )}
 
       {/* Control Buttons Row - Responsive and Always Accessible */}
-      <div className="fixed bottom-16 sm:bottom-20 left-2 right-2 sm:left-4 sm:right-4 z-[9998]">
+      <div className="fixed bottom-12 left-2 right-2 sm:left-4 sm:right-4 z-[9998]">
         {/* Mobile: Stack buttons vertically for small screens */}
         <div className="block sm:hidden">
           <div className="flex flex-col gap-2 items-center">
