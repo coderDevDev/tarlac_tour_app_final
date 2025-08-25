@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import {
   useGLTF,
   Html,
   useAnimations,
   OrbitControls,
-  PerspectiveCamera
+  PerspectiveCamera,
+  TransformControls
 } from '@react-three/drei';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -18,19 +19,38 @@ import {
   Camera,
   Globe,
   Target,
-  RefreshCw
+  RefreshCw,
+  Move,
+  RotateCw as RotateIcon,
+  ZoomIn,
+  Hand
 } from 'lucide-react';
 import * as THREE from 'three';
 
 interface ModelProps {
   url: string;
   position?: [number, number, number];
+  rotation?: [number, number, number];
+  scale?: number;
+  isSelected?: boolean;
+  onSelect?: () => void;
+  onDeselect?: () => void;
 }
 
-function ARModel({ url, position = [0, 0, 0] }: ModelProps) {
+function ARModel({
+  url,
+  position = [0, 0, 0],
+  rotation = [0, 0, 0],
+  scale = 1.5,
+  isSelected = false,
+  onSelect,
+  onDeselect,
+  onRefReady
+}: ModelProps & { onRefReady?: (ref: React.RefObject<THREE.Group>) => void }) {
   const { scene, animations } = useGLTF(url);
   const { actions, mixer } = useAnimations(animations, scene);
   const meshRef = useRef<THREE.Mesh>(null);
+  const groupRef = useRef<THREE.Group>(null);
 
   useEffect(() => {
     // Play the first animation if available
@@ -41,15 +61,51 @@ function ARModel({ url, position = [0, 0, 0] }: ModelProps) {
       }
     }
 
+    // Pass ref back to parent when ready
+    if (groupRef.current && onRefReady) {
+      onRefReady(groupRef);
+    }
+
     return () => {
       if (mixer) {
         mixer.stopAllAction();
       }
     };
-  }, [actions, animations, mixer]);
+  }, [actions, animations, mixer, onRefReady]);
+
+  // Handle model selection
+  const handleModelClick = (event: any) => {
+    event.stopPropagation();
+    if (isSelected) {
+      onDeselect?.();
+    } else {
+      onSelect?.();
+    }
+  };
 
   return (
-    <primitive ref={meshRef} object={scene} scale={1.5} position={position} />
+    <group ref={groupRef} position={position} rotation={rotation} scale={scale}>
+      <primitive
+        ref={meshRef}
+        object={scene}
+        onClick={handleModelClick}
+        onPointerOver={(e: any) => {
+          document.body.style.cursor = 'pointer';
+        }}
+        onPointerOut={(e: any) => {
+          document.body.style.cursor = 'default';
+        }}
+      />
+
+      {/* Selection indicator */}
+      {isSelected && (
+        <Html center>
+          <div className="bg-blue-500 text-white px-2 py-1 rounded text-xs font-medium">
+            Selected
+          </div>
+        </Html>
+      )}
+    </group>
   );
 }
 
@@ -71,11 +127,24 @@ export default function ARWorldViewer({
       id: string;
       position: [number, number, number];
       rotation: [number, number, number];
+      scale: number;
+      ref?: React.RefObject<THREE.Group>;
     }>
   >([]);
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  const [interactionMode, setInteractionMode] = useState<
+    'place' | 'select' | 'transform'
+  >('place');
+  const [transformMode, setTransformMode] = useState<
+    'translate' | 'rotate' | 'scale'
+  >('translate');
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const modelRefs = useRef<Map<string, React.RefObject<THREE.Group>>>(
+    new Map()
+  );
 
   // Check AR support and camera permissions
   useEffect(() => {
@@ -114,7 +183,8 @@ export default function ARWorldViewer({
       const newModel = {
         id: Date.now().toString(),
         position: [hit.x, hit.y, hit.z] as [number, number, number],
-        rotation: [0, 0, 0] as [number, number, number]
+        rotation: [0, 0, 0] as [number, number, number],
+        scale: 1.5
       };
       setPlacedModels(prev => [...prev, newModel]);
     },
@@ -122,11 +192,45 @@ export default function ARWorldViewer({
   );
 
   const removeModel = (id: string) => {
-    setPlacedModels(prev => prev.filter(model => model.id !== id));
+    setPlacedModels(prev => prev.filter(model => model.id !== model.id));
+    if (selectedModelId === id) {
+      setSelectedModelId(null);
+    }
   };
 
   const resetModels = () => {
     setPlacedModels([]);
+    setSelectedModelId(null);
+  };
+
+  const selectModel = (id: string) => {
+    setSelectedModelId(id);
+    setInteractionMode('select');
+  };
+
+  const deselectModel = () => {
+    setSelectedModelId(null);
+    setInteractionMode('place');
+  };
+
+  const updateModelTransform = (
+    id: string,
+    updates: Partial<{
+      position: [number, number, number];
+      rotation: [number, number, number];
+      scale: number;
+    }>
+  ) => {
+    setPlacedModels(prev =>
+      prev.map(model => (model.id === id ? { ...model, ...updates } : model))
+    );
+  };
+
+  const handleModelRefReady = (
+    id: string,
+    ref: React.RefObject<THREE.Group>
+  ) => {
+    modelRefs.current.set(id, ref);
   };
 
   const startCamera = async () => {
@@ -295,7 +399,8 @@ export default function ARWorldViewer({
 
   // Handle touch/click to place models
   const handleContainerClick = (event: React.MouseEvent) => {
-    if (!cameraActive || !containerRef.current) return;
+    if (!cameraActive || !containerRef.current || interactionMode !== 'place')
+      return;
 
     const rect = containerRef.current.getBoundingClientRect();
     const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -305,7 +410,8 @@ export default function ARWorldViewer({
     const newModel = {
       id: Date.now().toString(),
       position: [x * 2, -y * 2, -2] as [number, number, number], // Further back but more spread out
-      rotation: [0, 0, 0] as [number, number, number]
+      rotation: [0, 0, 0] as [number, number, number],
+      scale: 1.5
     };
 
     console.log('Placing model at:', newModel.position, 'from click at:', {
@@ -336,13 +442,22 @@ export default function ARWorldViewer({
       arSupported,
       cameraActive,
       placedModelsCount: placedModels.length,
-      showInfo
+      showInfo,
+      selectedModelId,
+      interactionMode
     });
 
     if (cameraActive) {
       console.log('Camera active, models count:', placedModels.length);
     }
-  }, [arSupported, cameraActive, placedModels.length, showInfo]);
+  }, [
+    arSupported,
+    cameraActive,
+    placedModels.length,
+    showInfo,
+    selectedModelId,
+    interactionMode
+  ]);
 
   // Cleanup camera on unmount
   useEffect(() => {
@@ -392,8 +507,10 @@ export default function ARWorldViewer({
       {/* Debug Status Bar */}
       <div className="absolute top-0 left-0 right-0 z-50 bg-black/50 text-white text-xs p-2 text-center">
         AR Supported: {arSupported ? 'Yes' : 'No'} | Camera:{' '}
-        {cameraActive ? 'Active' : 'Inactive'} | Models: {placedModels.length}
+        {cameraActive ? 'Active' : 'Inactive'} | Models: {placedModels.length} |
+        Mode: {interactionMode}
       </div>
+
       {/* Camera Feed with 3D Overlay */}
       {cameraActive ? (
         <div className="w-full h-full relative">
@@ -456,8 +573,42 @@ export default function ARWorldViewer({
                   key={model.id}
                   url={modelUrl}
                   position={model.position}
+                  rotation={model.rotation}
+                  scale={model.scale}
+                  isSelected={selectedModelId === model.id}
+                  onSelect={() => selectModel(model.id)}
+                  onDeselect={deselectModel}
+                  onRefReady={ref => handleModelRefReady(model.id, ref)}
                 />
               ))}
+
+              {/* Transform Controls for Selected Model */}
+              {selectedModelId &&
+                interactionMode === 'transform' &&
+                modelRefs.current.get(selectedModelId)?.current && (
+                  <TransformControls
+                    mode={transformMode}
+                    object={modelRefs.current.get(selectedModelId)!.current!}
+                    onObjectChange={(e: any) => {
+                      if (e?.target?.object) {
+                        const obj = e.target.object;
+                        updateModelTransform(selectedModelId, {
+                          position: [
+                            obj.position.x,
+                            obj.position.y,
+                            obj.position.z
+                          ],
+                          rotation: [
+                            obj.rotation.x,
+                            obj.rotation.y,
+                            obj.rotation.z
+                          ],
+                          scale: obj.scale.x
+                        });
+                      }
+                    }}
+                  />
+                )}
 
               {/* Debug Grid to help visualize 3D space */}
               <gridHelper args={[10, 10, 0x444444, 0x888888]} />
@@ -546,7 +697,11 @@ export default function ARWorldViewer({
               animate={{ opacity: 1, y: 0 }}
               className="bg-background/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg">
               <p className="text-sm font-medium text-white">
-                Tap anywhere to place {siteName}
+                {interactionMode === 'place'
+                  ? `Tap anywhere to place ${siteName}`
+                  : interactionMode === 'select'
+                  ? 'Tap a model to select it'
+                  : 'Use controls to transform the model'}
               </p>
             </motion.div>
           </div>
@@ -592,6 +747,70 @@ export default function ARWorldViewer({
           )}
         </Button>
       </div>
+
+      {/* Interaction Mode Controls */}
+      {cameraActive && placedModels.length > 0 && (
+        <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-[9998]">
+          <div className="flex gap-2 bg-background/90 backdrop-blur-sm rounded-lg p-2 shadow-lg border">
+            <Button
+              size="sm"
+              variant={interactionMode === 'place' ? 'default' : 'outline'}
+              onClick={() => setInteractionMode('place')}
+              className="gap-1 text-xs">
+              <Target className="h-3 w-3" />
+              Place
+            </Button>
+            <Button
+              size="sm"
+              variant={interactionMode === 'select' ? 'default' : 'outline'}
+              onClick={() => setInteractionMode('select')}
+              className="gap-1 text-xs">
+              <Hand className="h-3 w-3" />
+              Select
+            </Button>
+            <Button
+              size="sm"
+              variant={interactionMode === 'transform' ? 'default' : 'outline'}
+              onClick={() => setInteractionMode('transform')}
+              className="gap-1 text-xs">
+              <Move className="h-3 w-3" />
+              Transform
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Transform Mode Controls */}
+      {cameraActive && interactionMode === 'transform' && selectedModelId && (
+        <div className="fixed bottom-32 left-1/2 transform -translate-x-1/2 z-[9997]">
+          <div className="flex gap-2 bg-background/90 backdrop-blur-sm rounded-lg p-2 shadow-lg border">
+            <Button
+              size="sm"
+              variant={transformMode === 'translate' ? 'default' : 'outline'}
+              onClick={() => setTransformMode('translate')}
+              className="gap-1 text-xs">
+              <Move className="h-3 w-3" />
+              Move
+            </Button>
+            <Button
+              size="sm"
+              variant={transformMode === 'rotate' ? 'default' : 'outline'}
+              onClick={() => setTransformMode('rotate')}
+              className="gap-1 text-xs">
+              <RotateIcon className="h-3 w-3" />
+              Rotate
+            </Button>
+            <Button
+              size="sm"
+              variant={transformMode === 'scale' ? 'default' : 'outline'}
+              onClick={() => setTransformMode('scale')}
+              className="gap-1 text-xs">
+              <ZoomIn className="h-3 w-3" />
+              Scale
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Control Buttons Row - Responsive and Always Accessible */}
       <div className="fixed bottom-16 sm:bottom-20 left-2 right-2 sm:left-4 sm:right-4 z-[9998]">
@@ -659,7 +878,8 @@ export default function ARWorldViewer({
                   const testModel = {
                     id: Date.now().toString(),
                     position: [0, 0, -1] as [number, number, number],
-                    rotation: [0, 0, 0] as [number, number, number]
+                    rotation: [0, 0, 0] as [number, number, number],
+                    scale: 1.5
                   };
                   setPlacedModels(prev => [...prev, testModel]);
                   console.log('Test model added at center');
@@ -788,7 +1008,8 @@ export default function ARWorldViewer({
                 const testModel = {
                   id: Date.now().toString(),
                   position: [0, 0, -1] as [number, number, number],
-                  rotation: [0, 0, 0] as [number, number, number]
+                  rotation: [0, 0, 0] as [number, number, number],
+                  scale: 1.5
                 };
                 setPlacedModels(prev => [...prev, testModel]);
                 console.log('Test model added at center');
@@ -831,8 +1052,11 @@ export default function ARWorldViewer({
             className="glass p-3 sm:p-4 rounded-xl shadow-lg max-w-xs mx-auto bg-background/90 backdrop-blur-sm border">
             <h3 className="font-bold mb-2 text-sm sm:text-base">{siteName}</h3>
             <p className="text-xs sm:text-sm text-muted-foreground mb-3">
-              Tap anywhere on the screen to place the 3D model in your
-              environment.
+              {interactionMode === 'place'
+                ? 'Tap anywhere on the screen to place the 3D model in your environment.'
+                : interactionMode === 'select'
+                ? 'Tap on a 3D model to select it for interaction.'
+                : 'Use the transform controls to move, rotate, or scale the selected model.'}
             </p>
             <div className="flex gap-2">
               <Button
@@ -856,7 +1080,14 @@ export default function ARWorldViewer({
           <div className="space-y-1 sm:space-y-2 max-h-[150px] sm:max-h-[200px] overflow-y-auto">
             {placedModels.map((model, index) => (
               <div key={model.id} className="flex items-center gap-2 text-xs">
-                <span className="flex-1">Model {index + 1}</span>
+                <span
+                  className={`flex-1 ${
+                    selectedModelId === model.id
+                      ? 'font-bold text-blue-600'
+                      : ''
+                  }`}>
+                  Model {index + 1}
+                </span>
                 <Button
                   size="sm"
                   variant="ghost"
@@ -871,7 +1102,7 @@ export default function ARWorldViewer({
       )}
 
       {/* Click Handler for Model Placement */}
-      {cameraActive && (
+      {cameraActive && interactionMode === 'place' && (
         <div
           className="absolute inset-0 z-10 cursor-crosshair"
           onClick={handleContainerClick}
