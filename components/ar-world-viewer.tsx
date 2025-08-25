@@ -102,11 +102,11 @@ function ARModel({
     }
   };
 
-  // Touch gesture handlers
+  // Touch gesture handlers - Always active when model is touched
   const handleTouchStart = (event: any) => {
-    if (!isSelected || !onTransform) return;
+    if (!onTransform) return;
 
-    // Prevent camera from responding to these touches
+    // Completely isolate touch events to prevent page zoom/rotation
     event.stopPropagation();
     event.preventDefault();
 
@@ -130,9 +130,9 @@ function ARModel({
   };
 
   const handleTouchMove = (event: any) => {
-    if (!isSelected || !onTransform) return;
+    if (!onTransform) return;
 
-    // Aggressively prevent camera interference
+    // Completely block all touch events to prevent page zoom/rotation
     event.stopPropagation();
     event.preventDefault();
 
@@ -172,11 +172,9 @@ function ARModel({
   };
 
   const handleTouchEnd = (event: any) => {
-    // Prevent camera from responding to touch end
-    if (isSelected) {
-      event.stopPropagation();
-      event.preventDefault();
-    }
+    // Completely block touch end events to prevent page zoom/rotation
+    event.stopPropagation();
+    event.preventDefault();
 
     touchState.current.isDragging = false;
     touchState.current.isRotating = false;
@@ -560,6 +558,54 @@ export default function ARWorldViewer({
     interactionMode
   ]);
 
+  // Prevent page zoom/rotation when models are being manipulated
+  useEffect(() => {
+    if (selectedModelId) {
+      // Disable page zoom and touch gestures
+      document.body.style.touchAction = 'none';
+      document.body.style.userSelect = 'none';
+      document.body.style.overflow = 'hidden';
+
+      // Add meta viewport to prevent zooming
+      const metaViewport = document.querySelector('meta[name="viewport"]');
+      if (metaViewport) {
+        metaViewport.setAttribute(
+          'content',
+          'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'
+        );
+      }
+    } else {
+      // Re-enable normal touch behavior
+      document.body.style.touchAction = '';
+      document.body.style.userSelect = '';
+      document.body.style.overflow = '';
+
+      // Restore normal viewport
+      const metaViewport = document.querySelector('meta[name="viewport"]');
+      if (metaViewport) {
+        metaViewport.setAttribute(
+          'content',
+          'width=device-width, initial-scale=1.0'
+        );
+      }
+    }
+
+    // Cleanup function
+    return () => {
+      document.body.style.touchAction = '';
+      document.body.style.userSelect = '';
+      document.body.style.overflow = '';
+
+      const metaViewport = document.querySelector('meta[name="viewport"]');
+      if (metaViewport) {
+        metaViewport.setAttribute(
+          'content',
+          'width=device-width, initial-scale=1.0'
+        );
+      }
+    };
+  }, [selectedModelId]);
+
   // Cleanup camera on unmount
   useEffect(() => {
     return () => {
@@ -777,9 +823,7 @@ export default function ARWorldViewer({
               <p className="text-sm font-medium text-white">
                 {interactionMode === 'place'
                   ? `Tap anywhere to place ${siteName}`
-                  : interactionMode === 'select'
-                  ? 'Tap a model to select it'
-                  : 'Use controls to transform the model'}
+                  : 'Touch models directly to move, rotate, or scale'}
               </p>
             </motion.div>
           </div>
@@ -826,44 +870,12 @@ export default function ARWorldViewer({
         </Button>
       </div>
 
-      {/* Interaction Mode Controls - Moved to top right for better accessibility */}
+      {/* Touch Gesture Instructions - Always visible when models are placed */}
       {cameraActive && placedModels.length > 0 && (
         <div className="fixed top-4 right-4 z-[9998]">
-          <div className="flex gap-2 bg-background/95 backdrop-blur-md rounded-xl p-3 shadow-xl border-2 border-primary/20">
-            <Button
-              size="sm"
-              variant={interactionMode === 'place' ? 'default' : 'outline'}
-              onClick={() => setInteractionMode('place')}
-              className="gap-1 text-sm px-3 py-2 min-w-[80px]">
-              <Target className="h-4 w-4" />
-              Place
-            </Button>
-            <Button
-              size="sm"
-              variant={interactionMode === 'select' ? 'default' : 'outline'}
-              onClick={() => setInteractionMode('select')}
-              className="gap-1 text-sm px-3 py-2 min-w-[80px]">
-              <Hand className="h-4 w-4" />
-              Select
-            </Button>
-            <Button
-              size="sm"
-              variant={interactionMode === 'transform' ? 'default' : 'outline'}
-              onClick={() => setInteractionMode('transform')}
-              className="gap-1 text-sm px-3 py-2 min-w-[80px]">
-              <Move className="h-4 w-4" />
-              Transform
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Touch Gesture Instructions - Shows when in transform mode */}
-      {cameraActive && interactionMode === 'transform' && selectedModelId && (
-        <div className="fixed top-24 right-4 z-[9997]">
-          <div className="bg-background/95 backdrop-blur-md rounded-xl p-3 shadow-xl border-2 border-blue-500/20 max-w-[200px]">
-            <div className="text-center text-sm font-medium text-blue-600 mb-2">
-              Touch Gestures Active
+          <div className="bg-background/95 backdrop-blur-md rounded-xl p-3 shadow-xl border-2 border-primary/20 max-w-[200px]">
+            <div className="text-center text-sm font-medium text-primary mb-2">
+              Touch Gestures
             </div>
             <div className="text-xs space-y-1 text-muted-foreground">
               <div>
@@ -876,12 +888,11 @@ export default function ARWorldViewer({
                 • <strong>Pinch:</strong> Scale model
               </div>
             </div>
-            <div className="mt-2 text-xs text-blue-500 font-medium">
-              Camera is locked during manipulation
-            </div>
           </div>
         </div>
       )}
+
+      {/* Removed transform mode instructions since gestures work directly on models */}
 
       {/* Control Buttons Row - Responsive and Always Accessible */}
       <div className="fixed bottom-12 left-2 right-2 sm:left-4 sm:right-4 z-[9998]">
@@ -1123,11 +1134,9 @@ export default function ARWorldViewer({
             className="glass p-3 sm:p-4 rounded-xl shadow-lg max-w-xs mx-auto bg-background/90 backdrop-blur-sm border">
             <h3 className="font-bold mb-2 text-sm sm:text-base">{siteName}</h3>
             <p className="text-xs sm:text-sm text-muted-foreground mb-3">
-              {interactionMode === 'place'
-                ? 'Tap anywhere on the screen to place the 3D model in your environment.'
-                : interactionMode === 'select'
-                ? 'Tap on a 3D model to select it for interaction.'
-                : 'Use the transform controls to move, rotate, or scale the selected model.'}
+              Tap anywhere on the screen to place the 3D model in your
+              environment. Once placed, touch the model directly to move,
+              rotate, or scale it.
             </p>
             <div className="flex gap-2">
               <Button
@@ -1172,27 +1181,34 @@ export default function ARWorldViewer({
         </div>
       )}
 
-      {/* Touch Event Isolation Layer - Prevents camera interference during model manipulation */}
+      {/* Touch Event Isolation Layer - Prevents camera interference and page zoom/rotation */}
       {cameraActive && (
         <div
           className="absolute inset-0 z-10"
-          style={{ pointerEvents: 'none' }}
+          style={{
+            pointerEvents: 'none',
+            touchAction: 'none', // Prevents page zoom/rotation
+            userSelect: 'none' // Prevents text selection
+          }}
           onTouchStart={e => {
-            // Only allow touches when in place mode or when touching models
-            if (interactionMode === 'place') {
+            // Block touches when models are being manipulated
+            if (selectedModelId) {
+              e.stopPropagation();
+              e.preventDefault();
+            } else if (interactionMode === 'place') {
               e.stopPropagation();
             }
           }}
           onTouchMove={e => {
-            // Prevent camera movement during model manipulation
-            if (selectedModelId && interactionMode === 'transform') {
+            // Prevent all touch events during model manipulation
+            if (selectedModelId) {
               e.stopPropagation();
               e.preventDefault();
             }
           }}
           onTouchEnd={e => {
-            // Prevent camera interference
-            if (selectedModelId && interactionMode === 'transform') {
+            // Block touch end events during model manipulation
+            if (selectedModelId) {
               e.stopPropagation();
               e.preventDefault();
             }
