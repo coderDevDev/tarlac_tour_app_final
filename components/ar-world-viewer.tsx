@@ -60,19 +60,9 @@ function ARModel({
   const meshRef = useRef<THREE.Mesh>(null);
   const groupRef = useRef<THREE.Group>(null);
 
-  // Touch gesture state
-  const touchState = useRef({
-    startX: 0,
-    startY: 0,
-    startDistance: 0,
-    startRotation: 0,
-    isDragging: false,
-    isRotating: false,
-    isScaling: false
-  });
-
-  // Touch feedback state
-  const [isBeingTouched, setIsBeingTouched] = useState(false);
+  {
+    /* Touch gestures now handled by OrbitControls */
+  }
 
   useEffect(() => {
     // Play the first animation if available
@@ -105,99 +95,9 @@ function ARModel({
     }
   };
 
-  // Touch gesture handlers - Always active when model is touched
-  const handleTouchStart = (event: any) => {
-    if (!onTransform) return;
-
-    console.log('Touch start on model:', { touches: event.touches.length });
-
-    // Isolate touch events to prevent page zoom/rotation
-    event.stopPropagation();
-
-    // Set touch feedback state
-    setIsBeingTouched(true);
-
-    const touches = event.touches;
-    touchState.current.startX = touches[0].clientX;
-    touchState.current.startY = touches[0].clientY;
-
-    if (touches.length === 1) {
-      touchState.current.isDragging = true;
-      console.log('Starting drag gesture');
-    } else if (touches.length === 2) {
-      touchState.current.isRotating = true;
-      touchState.current.startDistance = Math.hypot(
-        touches[1].clientX - touches[0].clientX,
-        touches[1].clientY - touches[0].clientY
-      );
-      touchState.current.startRotation = Math.atan2(
-        touches[1].clientY - touches[0].clientY,
-        touches[1].clientX - touches[0].clientX
-      );
-      console.log('Starting rotate/scale gesture');
-    }
-  };
-
-  const handleTouchMove = (event: any) => {
-    if (!onTransform) return;
-
-    // Isolate touch events to prevent page zoom/rotation
-    event.stopPropagation();
-
-    const touches = event.touches;
-
-    if (touchState.current.isDragging && touches.length === 1) {
-      const deltaX = (touches[0].clientX - touchState.current.startX) * 0.01;
-      const deltaY = (touches[0].clientY - touchState.current.startY) * 0.01;
-
-      console.log('Dragging model:', {
-        deltaX,
-        deltaY,
-        newPosition: [position[0] + deltaX, position[1] - deltaY, position[2]]
-      });
-
-      onTransform({
-        position: [position[0] + deltaX, position[1] - deltaY, position[2]]
-      });
-
-      touchState.current.startX = touches[0].clientX;
-      touchState.current.startY = touches[0].clientY;
-    } else if (touchState.current.isRotating && touches.length === 2) {
-      const currentDistance = Math.hypot(
-        touches[1].clientX - touches[0].clientX,
-        touches[1].clientY - touches[0].clientY
-      );
-      const currentRotation = Math.atan2(
-        touches[1].clientY - touches[0].clientY,
-        touches[1].clientX - touches[0].clientX
-      );
-
-      const rotationDelta = currentRotation - touchState.current.startRotation;
-      const scaleDelta = currentDistance / touchState.current.startDistance;
-
-      console.log('Rotating/scaling model:', { rotationDelta, scaleDelta });
-
-      onTransform({
-        rotation: [rotation[0], rotation[1] + rotationDelta, rotation[2]],
-        scale: scale * scaleDelta
-      });
-
-      touchState.current.startDistance = currentDistance;
-      touchState.current.startRotation = currentRotation;
-    }
-  };
-
-  const handleTouchEnd = (event: any) => {
-    // Isolate touch end events to prevent page zoom/rotation
-    event.stopPropagation();
-
-    // Clear touch feedback state
-    setIsBeingTouched(false);
-
-    touchState.current.isDragging = false;
-    touchState.current.isRotating = false;
-    touchState.current.isScaling = false;
-  };
+  {
+    /* Touch gestures now handled by OrbitControls */
+  }
 
   return (
     <group ref={groupRef} position={position} rotation={rotation} scale={scale}>
@@ -211,34 +111,6 @@ function ARModel({
         onPointerOut={(e: any) => {
           document.body.style.cursor = 'default';
         }}
-        onTouchStart={(e: any) => {
-          console.log(
-            '🎯 MODEL TOUCH START:',
-            e.touches.length,
-            'on model:',
-            url
-          );
-          console.log(
-            'Touch coordinates:',
-            e.touches[0]?.clientX,
-            e.touches[0]?.clientY
-          );
-          console.log('Model position:', position);
-          handleTouchStart(e);
-        }}
-        onTouchMove={(e: any) => {
-          console.log('🎯 MODEL TOUCH MOVE:', e.touches.length);
-          console.log(
-            'Touch coordinates:',
-            e.touches[0]?.clientX,
-            e.touches[0]?.clientY
-          );
-          handleTouchMove(e);
-        }}
-        onTouchEnd={(e: any) => {
-          console.log('🎯 MODEL TOUCH END');
-          handleTouchEnd(e);
-        }}
       />
 
       {/* Selection indicator */}
@@ -250,31 +122,10 @@ function ARModel({
         </Html>
       )}
 
-      {/* Touch feedback indicator */}
-      {(touchState.current.isDragging || touchState.current.isRotating) && (
-        <Html center>
-          <div className="bg-green-500 text-white px-2 py-1 rounded text-xs font-medium animate-pulse">
-            {touchState.current.isDragging ? 'Moving...' : 'Rotating...'}
-          </div>
-        </Html>
-      )}
-
-      {/* Touch detection indicator */}
-      <Html center>
-        <div className="bg-yellow-500 text-black px-2 py-1 rounded text-xs font-medium opacity-50">
-          Touch me!
-        </div>
-      </Html>
-
-      {/* Touch feedback indicator */}
+      {/* Simple indicator that model is ready */}
       <Html position={[0, 1, 0]}>
-        <div
-          className={`px-2 py-1 rounded text-xs font-medium ${
-            isBeingTouched
-              ? 'bg-red-500 text-white animate-pulse'
-              : 'bg-green-500 text-white'
-          }`}>
-          {isBeingTouched ? 'Touch Active!' : 'Ready for touch'}
+        <div className="bg-green-500 text-white px-2 py-1 rounded text-xs font-medium">
+          Ready for interaction
         </div>
       </Html>
     </group>
@@ -727,7 +578,7 @@ export default function ARWorldViewer({
             </div>
           )}
 
-          {/* 3D Models Overlay */}
+          {/* 3D Models Overlay - Always use OrbitControls for consistent touch handling */}
           <div className="absolute inset-0 z-80">
             <Canvas
               style={{
@@ -741,21 +592,6 @@ export default function ARWorldViewer({
                 alpha: true,
                 antialias: true,
                 preserveDrawingBuffer: true
-              }}
-              onTouchStart={e => {
-                console.log('Canvas touch start:', e.touches.length);
-                // Allow touch events to reach models
-                e.stopPropagation();
-              }}
-              onTouchMove={e => {
-                console.log('Canvas touch move:', e.touches.length);
-                // Allow touch events to reach models
-                e.stopPropagation();
-              }}
-              onTouchEnd={e => {
-                console.log('Canvas touch end');
-                // Allow touch events to reach models
-                e.stopPropagation();
               }}>
               <PerspectiveCamera makeDefault position={[0, 0, 5]} fov={75} />
               <ambientLight intensity={1.5} />
@@ -780,7 +616,17 @@ export default function ARWorldViewer({
                 />
               ))}
 
-              {/* Touch gesture controls are now handled directly on the models */}
+              {/* Always use OrbitControls for consistent touch handling */}
+              <OrbitControls
+                enableZoom={true}
+                enablePan={true}
+                enableRotate={true}
+                minDistance={2}
+                maxDistance={10}
+                target={[0, 0, 0]}
+                enableDamping={true}
+                dampingFactor={0.05}
+              />
 
               {/* Debug Grid to help visualize 3D space */}
               <gridHelper args={[10, 10, 0x444444, 0x888888]} />
@@ -1275,7 +1121,8 @@ export default function ARWorldViewer({
           <div className="mt-2 text-xs">
             <div>Video pointer-events: none</div>
             <div>Canvas z-index: 80</div>
-            <div>Touch events should work now</div>
+            <div>Using OrbitControls for touch</div>
+            <div>Touch gestures should work now!</div>
           </div>
         </div>
       )}
