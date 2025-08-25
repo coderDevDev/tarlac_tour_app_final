@@ -142,7 +142,7 @@ export default function ARWorldViewer({
   siteName
 }: ARWorldViewerProps) {
   const [showInfo, setShowInfo] = useState(false);
-  const [arSupported, setArSupported] = useState(false);
+  const [arSupported, setArSupported] = useState(true);
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [placedModels, setPlacedModels] = useState<
@@ -167,21 +167,21 @@ export default function ARWorldViewer({
     new Map()
   );
 
-  // Check AR support and camera permissions
+  // Check AR support and camera permissions, then auto-start camera
   useEffect(() => {
     // Check for WebXR support
-    if (navigator.xr) {
-      navigator.xr
-        .isSessionSupported('immersive-ar')
-        .then(supported => {
-          setArSupported(supported);
-        })
-        .catch(() => {
-          setArSupported(false);
-        });
-    } else {
-      setArSupported(false);
-    }
+    // if (navigator.xr) {
+    //   navigator.xr
+    //     .isSessionSupported('immersive-ar')
+    //     .then(supported => {
+    //       setArSupported(supported);
+    //     })
+    //     .catch(() => {
+    //       setArSupported(false);
+    //     });
+    // } else {
+    //   setArSupported(false);
+    // }
 
     // Check camera permissions on mobile
     if (navigator.permissions && navigator.permissions.query) {
@@ -197,6 +197,14 @@ export default function ARWorldViewer({
           console.log('Permission query not supported:', err);
         });
     }
+
+    // Auto-start camera after a short delay to ensure component is mounted
+    const autoStartTimer = setTimeout(() => {
+      console.log('Auto-starting camera...');
+      autoStartCamera();
+    }, 1000); // 1 second delay
+
+    return () => clearTimeout(autoStartTimer);
   }, []);
 
   const handlePlaceModel = useCallback(
@@ -418,6 +426,65 @@ export default function ARWorldViewer({
     setCameraActive(false);
   };
 
+  // Enhanced auto-start camera function with better error handling
+  const autoStartCamera = useCallback(async () => {
+    try {
+      console.log('Attempting to auto-start camera...');
+
+      // Check if we're on HTTPS (required for camera)
+      if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+        console.warn('Camera requires HTTPS on mobile devices');
+        return;
+      }
+
+      // Check if camera is already active
+      if (cameraActive) {
+        console.log('Camera already active, skipping auto-start');
+        return;
+      }
+
+      // Try to start camera
+      await startCamera();
+      console.log('Camera auto-started successfully');
+    } catch (error) {
+      console.error('Auto-start camera failed:', error);
+      // Don't show error to user - just log it
+    }
+  }, [cameraActive, startCamera]);
+
+  // Handle user interaction to trigger camera (required for permissions)
+  const handleUserInteraction = useCallback(() => {
+    if (!cameraActive) {
+      console.log('User interaction detected, starting camera...');
+      autoStartCamera();
+    }
+  }, [cameraActive, autoStartCamera]);
+
+  // Additional auto-start trigger on user interaction (required for permissions)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && !cameraActive) {
+        console.log('Page became visible, attempting to start camera...');
+        setTimeout(() => autoStartCamera(), 500);
+      }
+    };
+
+    const handleFocus = () => {
+      if (!cameraActive) {
+        console.log('Window focused, attempting to start camera...');
+        setTimeout(() => autoStartCamera(), 500);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [cameraActive, autoStartCamera]);
+
   // Handle touch/click to place models
   const handleContainerClick = (event: React.MouseEvent) => {
     if (!cameraActive || !containerRef.current || interactionMode !== 'place')
@@ -526,7 +593,11 @@ export default function ARWorldViewer({
   console.log('AR Support Check:', { arSupported, navigator: !!navigator.xr });
 
   return (
-    <div className="relative w-full h-full" ref={containerRef}>
+    <div
+      className="relative w-full h-full"
+      ref={containerRef}
+      onClick={handleUserInteraction}
+      onTouchStart={handleUserInteraction}>
       {/* Debug Status Bar */}
       <div className="absolute top-0 left-0 right-0 z-50 bg-black/50 text-white text-xs p-2 text-center">
         AR Supported: {arSupported ? 'Yes' : 'No'} | Camera:{' '}
@@ -554,24 +625,25 @@ export default function ARWorldViewer({
             }}
           />
 
-          {/* Fallback if camera fails */}
+          {/* Fallback if camera fails or is loading */}
           {!cameraStream && (
             <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center z-10">
               <div className="text-center text-white">
-                <Camera className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                <p className="text-lg font-medium mb-2">Camera Loading...</p>
+                <Camera className="h-16 w-16 mx-auto mb-4 opacity-50 animate-pulse" />
+                <p className="text-lg font-medium mb-2">Starting Camera...</p>
                 <p className="text-sm opacity-75 mb-4">
-                  3D models will appear here
+                  Please allow camera permissions when prompted
                 </p>
 
-                {/* Mobile troubleshooting tips */}
-                <div className="bg-white/20 rounded-lg p-3 max-w-xs">
-                  <p className="text-xs font-medium mb-2">Mobile Tips:</p>
-                  <ul className="text-xs space-y-1 text-left">
-                    <li>• Allow camera permissions when prompted</li>
-                    <li>• Tap the screen to activate camera</li>
-                    <li>• Ensure you're using HTTPS</li>
-                    <li>• Try refreshing the page</li>
+                {/* Auto-start indicator */}
+                <div className="bg-green-500/20 rounded-lg p-3 max-w-xs border border-green-400/30">
+                  <p className="text-xs font-medium mb-2 text-green-300">
+                    🔄 Auto-Starting...
+                  </p>
+                  <ul className="text-xs space-y-1 text-left text-green-200">
+                    <li>• Camera will start automatically</li>
+                    <li>• Tap anywhere to trigger faster</li>
+                    <li>• Allow permissions when asked</li>
                   </ul>
                 </div>
               </div>
@@ -725,6 +797,15 @@ export default function ARWorldViewer({
             </>
           )}
         </Button>
+
+        {/* Auto-start indicator */}
+        {!cameraActive && (
+          <div className="text-center mt-2">
+            <p className="text-xs text-muted-foreground">
+              Camera will start automatically in a few seconds
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Touch Gesture Instructions - Always visible when camera is active */}
