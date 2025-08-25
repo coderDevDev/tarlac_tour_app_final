@@ -72,18 +72,10 @@ function ARCameraContent() {
     checkPermissions();
   }, []);
 
-  // Add this useEffect to log camera permission status changes
-  // Add this right after the existing useEffect for checking permissions
-
+  // Log camera permission status changes (but don't auto-start camera)
   useEffect(() => {
-    console.log('Camera permission status:', cameraPermission);
-
-    // If permission was just granted, try starting the camera
-    if (cameraPermission === 'granted' && cameraActive && !streamRef.current) {
-      console.log('Permission granted, starting camera');
-      startCamera();
-    }
-  }, [cameraPermission, cameraActive]);
+    console.log('Camera permission status changed:', cameraPermission);
+  }, [cameraPermission]);
 
   // Debug: Log when video ref becomes available
   useEffect(() => {
@@ -250,6 +242,8 @@ function ARCameraContent() {
 
       setCameraPermission('granted');
       setCameraActive(true);
+      setError(null); // Clear any previous errors
+      console.log('Camera started successfully!');
     } catch (err: any) {
       console.error('Error starting camera:', err);
       setError(
@@ -323,9 +317,9 @@ function ARCameraContent() {
 
       setCameraPermission('granted');
 
-      // Now start the actual camera with proper setup
-      console.log('Permission granted, starting actual camera...');
-      setCameraActive(true);
+      // Don't auto-start camera - let user click "Start Camera" button
+      console.log('Permission granted, camera ready to start');
+      setError('Camera permission granted! Click "Start Camera" to begin.');
     } catch (err: any) {
       console.error('Error requesting camera permission:', err);
 
@@ -740,13 +734,19 @@ function ARCameraContent() {
                   </div>
 
                   <Button
-                    onClick={requestCameraPermission}
+                    onClick={
+                      cameraPermission === 'granted'
+                        ? startCamera
+                        : requestCameraPermission
+                    }
                     className="w-full rounded-full"
                     disabled={isLoading}>
                     {isLoading ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Requesting Permission...
+                        {cameraPermission === 'granted'
+                          ? 'Starting Camera...'
+                          : 'Requesting Permission...'}
                       </>
                     ) : (
                       <>
