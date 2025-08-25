@@ -598,23 +598,8 @@ export default function ARWorldViewer({
               <directionalLight position={[10, 10, 5]} intensity={2.5} />
               <pointLight position={[0, 5, 5]} intensity={1.0} />
 
-              {/* Placed Models */}
-              {placedModels.map(model => (
-                <ARModel
-                  key={model.id}
-                  url={modelUrl}
-                  position={model.position}
-                  rotation={model.rotation}
-                  scale={model.scale}
-                  isSelected={selectedModelId === model.id}
-                  onSelect={() => selectModel(model.id)}
-                  onDeselect={deselectModel}
-                  onRefReady={ref => handleModelRefReady(model.id, ref)}
-                  onTransform={updates =>
-                    updateModelTransform(model.id, updates)
-                  }
-                />
-              ))}
+              {/* Single 3D Model - Centered and ready for interaction */}
+              <ARModel url={modelUrl} position={[0, 0, 0]} scale={1.5} />
 
               {/* Always use OrbitControls for consistent touch handling */}
               <OrbitControls
@@ -633,13 +618,10 @@ export default function ARWorldViewer({
             </Canvas>
           </div>
 
-          {/* Visual Feedback for Model Placement */}
-          {placedModels.length > 0 && (
-            <div className="absolute top-4 right-4 bg-green-500/90 text-white px-3 py-1 rounded-full text-sm font-medium">
-              {placedModels.length} model{placedModels.length !== 1 ? 's' : ''}{' '}
-              placed
-            </div>
-          )}
+          {/* Single Model Status */}
+          <div className="absolute top-4 right-4 bg-green-500/90 text-white px-3 py-1 rounded-full text-sm font-medium">
+            3D Model Ready
+          </div>
 
           {/* Camera Status Indicator */}
           <div className="absolute top-4 left-4 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
@@ -691,16 +673,14 @@ export default function ARWorldViewer({
 
           {/* Removed confusing green border indicator */}
 
-          {/* Placement Instructions */}
+          {/* Touch Instructions */}
           <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2 text-center">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               className="bg-background/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg">
               <p className="text-sm font-medium text-white">
-                {interactionMode === 'place'
-                  ? `Tap anywhere to place ${siteName}`
-                  : 'Touch models directly to move, rotate, or scale'}
+                Touch the 3D model to interact with it
               </p>
             </motion.div>
           </div>
@@ -747,8 +727,8 @@ export default function ARWorldViewer({
         </Button>
       </div>
 
-      {/* Touch Gesture Instructions - Always visible when models are placed */}
-      {cameraActive && placedModels.length > 0 && (
+      {/* Touch Gesture Instructions - Always visible when camera is active */}
+      {cameraActive && (
         <div className="fixed top-4 right-4 z-[9998]">
           <div className="bg-background/95 backdrop-blur-md rounded-xl p-3 shadow-xl border-2 border-primary/20 max-w-[200px]">
             <div className="text-center text-sm font-medium text-primary mb-2">
@@ -756,13 +736,13 @@ export default function ARWorldViewer({
             </div>
             <div className="text-xs space-y-1 text-muted-foreground">
               <div>
-                • <strong>One finger:</strong> Move model
+                • <strong>One finger:</strong> Move the camera view
               </div>
               <div>
-                • <strong>Two fingers:</strong> Rotate model
+                • <strong>Two fingers:</strong> Rotate the camera view
               </div>
               <div>
-                • <strong>Pinch:</strong> Scale model
+                • <strong>Pinch:</strong> Zoom in/out
               </div>
             </div>
           </div>
@@ -1039,9 +1019,9 @@ export default function ARWorldViewer({
             className="glass p-3 sm:p-4 rounded-xl shadow-lg max-w-xs mx-auto bg-background/90 backdrop-blur-sm border">
             <h3 className="font-bold mb-2 text-sm sm:text-base">{siteName}</h3>
             <p className="text-xs sm:text-sm text-muted-foreground mb-3">
-              Tap anywhere on the screen to place the 3D model in your
-              environment. Once placed, touch the model directly to move,
-              rotate, or scale it.
+              The 3D model is overlaid on your camera view. Use touch gestures
+              to interact with it - drag to move, pinch to zoom, and rotate with
+              two fingers.
             </p>
             <div className="flex gap-2">
               <Button
@@ -1056,35 +1036,14 @@ export default function ARWorldViewer({
         </div>
       )}
 
-      {/* Placed Models List - Always Accessible */}
-      {placedModels.length > 0 && (
-        <div className="fixed top-16 sm:top-20 right-2 sm:right-4 z-[9995] bg-background/90 backdrop-blur-sm rounded-lg p-2 sm:p-3 shadow-lg border max-w-[180px] sm:max-w-[200px]">
-          <h4 className="text-xs sm:text-sm font-medium mb-2">
-            Placed Models ({placedModels.length})
-          </h4>
-          <div className="space-y-1 sm:space-y-2 max-h-[150px] sm:max-h-[200px] overflow-y-auto">
-            {placedModels.map((model, index) => (
-              <div key={model.id} className="flex items-center gap-2 text-xs">
-                <span
-                  className={`flex-1 ${
-                    selectedModelId === model.id
-                      ? 'font-bold text-blue-600'
-                      : ''
-                  }`}>
-                  Model {index + 1}
-                </span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => removeModel(model.id)}
-                  className="h-5 w-5 sm:h-6 sm:w-6 p-0 hover:bg-red-100">
-                  <X className="h-2 w-2 sm:h-3 sm:w-3" />
-                </Button>
-              </div>
-            ))}
-          </div>
+      {/* Single Model Status - Always Accessible */}
+      <div className="fixed top-16 sm:top-20 right-2 sm:right-4 z-[9995] bg-background/90 backdrop-blur-sm rounded-lg p-2 sm:p-3 shadow-lg border max-w-[180px] sm:max-w-[200px]">
+        <h4 className="text-xs sm:text-sm font-medium mb-2">3D Model Status</h4>
+        <div className="text-xs text-green-600 font-medium">✓ Model Loaded</div>
+        <div className="text-xs text-muted-foreground mt-1">
+          Use touch gestures to interact
         </div>
-      )}
+      </div>
 
       {/* Removed touch isolation layer that was blocking model touches */}
 
@@ -1127,14 +1086,7 @@ export default function ARWorldViewer({
         </div>
       )}
 
-      {/* Click Handler for Model Placement */}
-      {cameraActive && interactionMode === 'place' && (
-        <div
-          className="absolute inset-0 z-10 cursor-crosshair"
-          onClick={handleContainerClick}
-          style={{ pointerEvents: 'auto' }}
-        />
-      )}
+      {/* No need for model placement - using single overlay model */}
     </div>
   );
 }
