@@ -716,7 +716,6 @@ export default function ARWorldViewer({
             autoPlay
             webkit-playsinline="true"
             style={{
-              transform: 'scaleX(-1)', // Mirror the camera for better UX
               objectFit: 'cover',
               pointerEvents: 'none', // Prevent video from capturing touch events
               touchAction: 'none', // Prevent touch actions on video
