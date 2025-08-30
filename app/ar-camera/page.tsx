@@ -2,9 +2,18 @@
 
 import type React from 'react';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Camera, X, Upload, RefreshCw } from 'lucide-react';
+import {
+  Camera,
+  X,
+  Upload,
+  RefreshCw,
+  Globe,
+  Info,
+  RotateCcw,
+  Hand
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -14,13 +23,52 @@ import {
   CardTitle
 } from '@/components/ui/card';
 import { getSiteById, getAllSiteIds } from '@/lib/data';
-import ARViewer from '@/components/ar-viewer';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Canvas, useThree } from '@react-three/fiber';
+import {
+  useGLTF,
+  Html,
+  useAnimations,
+  OrbitControls,
+  PerspectiveCamera
+} from '@react-three/drei';
+import * as THREE from 'three';
 
 declare global {
   interface Window {
     qrScanInterval?: NodeJS.Timeout | null;
   }
+}
+
+// AR Model Component for overlay
+function ARModelOverlay({
+  url,
+  position = [0, 0, 0],
+  scale = 1.5
+}: {
+  url: string;
+  position?: [number, number, number];
+  scale?: number;
+}) {
+  const { scene, animations } = useGLTF(url);
+  const { actions, mixer } = useAnimations(animations, scene);
+
+  useEffect(() => {
+    if (animations.length > 0 && actions) {
+      const firstAction = Object.values(actions)[0];
+      if (firstAction) {
+        firstAction.play();
+      }
+    }
+
+    return () => {
+      if (mixer) {
+        mixer.stopAllAction();
+      }
+    };
+  }, [actions, animations, mixer]);
+
+  return <primitive object={scene} position={position} scale={scale} />;
 }
 
 export default function ARCameraPage() {
@@ -34,10 +82,13 @@ export default function ARCameraPage() {
   >('unknown');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [arMode, setArMode] = useState(false); // New: AR overlay mode
+  const [currentSite, setCurrentSite] = useState<any>(null); // New: Current site for AR
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const site = siteId ? getSiteById(siteId) : null;
   const validSiteIds = getAllSiteIds();
@@ -46,14 +97,12 @@ export default function ARCameraPage() {
   useEffect(() => {
     const checkPermissions = async () => {
       try {
-        // Check if the browser supports the permissions API
         if (navigator.permissions && navigator.permissions.query) {
           const result = await navigator.permissions.query({
             name: 'camera' as PermissionName
           });
           setCameraPermission(result.state as 'granted' | 'denied' | 'prompt');
 
-          // Listen for permission changes
           result.onchange = () => {
             setCameraPermission(
               result.state as 'granted' | 'denied' | 'prompt'
@@ -71,7 +120,6 @@ export default function ARCameraPage() {
   useEffect(() => {
     console.log('Camera permission status:', cameraPermission);
 
-    // If permission was just granted, try starting the camera
     if (cameraPermission === 'granted' && cameraActive && !streamRef.current) {
       console.log('Permission granted, starting camera');
       startCamera();
@@ -81,7 +129,6 @@ export default function ARCameraPage() {
   // Handle camera activation
   useEffect(() => {
     if (cameraActive) {
-      // Add a small delay to ensure the video element is rendered
       const timer = setTimeout(() => {
         startCamera();
       }, 50);
@@ -110,7 +157,6 @@ export default function ARCameraPage() {
         console.log(
           'Video element not found, waiting for it to be available...'
         );
-        // Wait a bit for the video element to be rendered
         await new Promise(resolve => setTimeout(resolve, 100));
 
         if (!videoRef.current) {
@@ -118,14 +164,12 @@ export default function ARCameraPage() {
         }
       }
 
-      // First stop any existing streams
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
 
       console.log('Requesting camera access...');
 
-      // Request camera access with explicit constraints
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: 'environment',
@@ -137,14 +181,13 @@ export default function ARCameraPage() {
 
       console.log('Camera access granted, setting up video element');
 
-      // Store the stream reference for cleanup
       streamRef.current = stream;
 
       if (!videoRef.current) {
         throw new Error('Video element not found after camera access granted');
       }
 
-      videoRef.current.srcObject = null; // Clear any existing source
+      videoRef.current.srcObject = null;
       videoRef.current.srcObject = stream;
       videoRef.current.onloadedmetadata = () => {
         console.log('Video metadata loaded, playing video');
@@ -153,7 +196,6 @@ export default function ARCameraPage() {
             .play()
             .then(() => {
               console.log('Video playing successfully');
-              // Start scanning for QR codes only after video is playing
               startQrScanning();
             })
             .catch(err => {
@@ -205,6 +247,10 @@ export default function ARCameraPage() {
       clearInterval(window.qrScanInterval);
       window.qrScanInterval = null;
     }
+
+    // Exit AR mode when stopping camera
+    setArMode(false);
+    setCurrentSite(null);
   };
 
   // Start scanning for QR codes
@@ -227,20 +273,17 @@ export default function ARCameraPage() {
         throw new Error('Window object not available');
       }
 
-      // Clear any existing interval
       if (window.qrScanInterval) {
         clearInterval(window.qrScanInterval);
         window.qrScanInterval = null;
       }
 
-      // Create a scanning interval
       window.qrScanInterval = setInterval(() => {
         if (videoRef.current && canvasRef.current) {
           const canvas = canvasRef.current;
           const video = videoRef.current;
 
           if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            // Set canvas dimensions to match video
             const videoWidth = video.videoWidth;
             const videoHeight = video.videoHeight;
 
@@ -248,12 +291,10 @@ export default function ARCameraPage() {
               canvas.width = videoWidth;
               canvas.height = videoHeight;
 
-              // Draw video frame to canvas
               const ctx = canvas.getContext('2d');
               if (ctx) {
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-                // Get image data for QR code detection
                 const imageData = ctx.getImageData(
                   0,
                   0,
@@ -262,7 +303,6 @@ export default function ARCameraPage() {
                 );
 
                 if (jsQR && typeof jsQR === 'function') {
-                  // Detect QR code
                   const code = jsQR(
                     imageData.data,
                     imageData.width,
@@ -274,7 +314,6 @@ export default function ARCameraPage() {
 
                   if (code) {
                     console.log('QR code detected:', code.data);
-                    // Process the QR code
                     processQrCode(code.data);
                   }
                 }
@@ -282,7 +321,7 @@ export default function ARCameraPage() {
             }
           }
         }
-      }, 200); // Scan every 200ms
+      }, 200);
     } catch (err) {
       console.error('Error starting QR scanning:', err);
       setError(
@@ -310,7 +349,6 @@ export default function ARCameraPage() {
         throw new Error('Failed to load QR scanner library');
       }
 
-      // Create an image from the file
       const img = new Image();
       img.src = URL.createObjectURL(file);
 
@@ -318,7 +356,6 @@ export default function ARCameraPage() {
         img.onload = resolve;
       });
 
-      // Create a canvas to draw the image
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d');
       if (!context) {
@@ -329,7 +366,6 @@ export default function ARCameraPage() {
       canvas.height = img.height;
       context.drawImage(img, 0, 0);
 
-      // Get image data for QR code processing
       const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
 
       if (jsQR && typeof jsQR === 'function') {
@@ -358,43 +394,47 @@ export default function ARCameraPage() {
     }
   };
 
-  // Process QR code data
+  // Process QR code data - Enhanced to enable AR mode
   const processQrCode = (data: string) => {
     try {
-      // Extract the siteId from the QR code data
       let extractedSiteId: string | null = null;
-
-      // Case 1: Full URL (e.g., https://example.com/ar-camera?siteId=site-id)
 
       if (data.includes('/ar-world?siteId=')) {
         try {
           const url = new URL(data);
           extractedSiteId = url.searchParams.get('siteId');
         } catch (e) {
-          // If it's not a valid URL, try to extract the siteId directly
-          const match = data.match(/\/ar-camera\?siteId=([^&]+)/);
+          const match = data.match(/\/ar-world\?siteId=([^&]+)/);
           if (match && match[1]) {
             extractedSiteId = match[1];
           }
         }
-      }
-      // Case 2: Just the path (e.g., /ar-camera?siteId=site-id)
-      else if (data.startsWith('/ar-world?siteId=')) {
+      } else if (data.startsWith('/ar-world?siteId=')) {
         const params = new URLSearchParams(data.split('?')[1]);
         extractedSiteId = params.get('siteId');
-      }
-      // Case 3: Just the site ID
-      else if (validSiteIds.includes(data)) {
+      } else if (validSiteIds.includes(data)) {
         extractedSiteId = data;
       }
 
       if (extractedSiteId && validSiteIds.includes(extractedSiteId)) {
-        // Stop scanning and camera
-        setScanning(false);
-        setCameraActive(false);
+        const site = getSiteById(extractedSiteId);
+        if (site) {
+          console.log('Site detected, enabling AR mode:', site.name);
 
-        // Navigate to the AR experience
-        router.push(`/ar-world?siteId=${extractedSiteId}`);
+          // Stop scanning but keep camera active
+          setScanning(false);
+
+          // Enable AR mode with the detected site
+          setCurrentSite(site);
+          setArMode(true);
+
+          // Show success message
+          setError(null);
+        } else {
+          setError(
+            'Site not found. Please scan a valid heritage site QR code.'
+          );
+        }
       } else {
         setError('Invalid QR code. Please scan a valid heritage site QR code.');
       }
@@ -416,7 +456,6 @@ export default function ARCameraPage() {
     try {
       console.log('Requesting camera permission...');
 
-      // Check if we already have permission
       if (navigator.permissions && navigator.permissions.query) {
         const result = await navigator.permissions.query({
           name: 'camera' as PermissionName
@@ -429,7 +468,6 @@ export default function ARCameraPage() {
         }
       }
 
-      // Set camera active which will trigger the useEffect to start the camera
       setCameraActive(true);
     } catch (err) {
       console.error('Error requesting camera permission:', err);
@@ -437,7 +475,15 @@ export default function ARCameraPage() {
     }
   };
 
-  // If a siteId is provided, show the AR viewer for that site
+  // Exit AR mode and return to scanning
+  const exitArMode = () => {
+    setArMode(false);
+    setCurrentSite(null);
+    setScanning(true);
+    startQrScanning();
+  };
+
+  // If a siteId is provided via URL, show the AR viewer for that site
   if (siteId && site) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -453,16 +499,33 @@ export default function ARCameraPage() {
         </div>
 
         <div className="h-[70vh] bg-black/5 rounded-2xl overflow-hidden shadow-lg">
-          <ARViewer
-            modelUrl={site.modelUrl || '/models/placeholder.glb'}
-            siteName={site.name}
-          />
+          <Canvas
+            style={{ width: '100%', height: '100%' }}
+            camera={{ position: [0, 0, 5], fov: 75 }}>
+            <PerspectiveCamera makeDefault position={[0, 0, 5]} fov={75} />
+            <ambientLight intensity={1.5} />
+            <directionalLight position={[10, 10, 5]} intensity={2.5} />
+            <pointLight position={[0, 5, 5]} intensity={1.0} />
+
+            <ARModelOverlay url={site.modelUrl || '/models/placeholder.glb'} />
+
+            <OrbitControls
+              enableZoom={true}
+              enablePan={true}
+              enableRotate={true}
+              minDistance={2}
+              maxDistance={10}
+              target={[0, 0, 0]}
+              enableDamping={true}
+              dampingFactor={0.05}
+            />
+          </Canvas>
         </div>
 
         <div className="mt-4 text-sm text-muted-foreground text-center">
           <p>
-            Move your device around to explore the 3D model. Pinch to zoom in
-            and out.
+            Move your device around to explore the 3D model. Use touch gestures
+            to interact.
           </p>
         </div>
       </div>
@@ -479,144 +542,252 @@ export default function ARCameraPage() {
         AR Experience
       </motion.h1>
 
-      <video
-        ref={videoRef}
-        className={`${
-          cameraActive
-            ? 'absolute inset-0 w-full h-full object-cover z-10'
-            : 'hidden'
-        }`}
-        playsInline
-        muted
-        autoPlay
-      />
-      <canvas ref={canvasRef} className="hidden" />
+      {/* Camera and AR Overlay Container */}
+      <div className="relative max-w-4xl mx-auto">
+        {/* Camera Feed - Always rendered but conditionally visible */}
+        <video
+          ref={videoRef}
+          className={`${
+            cameraActive
+              ? 'absolute inset-0 w-full h-full object-cover z-10 rounded-2xl'
+              : 'hidden'
+          }`}
+          playsInline
+          muted
+          autoPlay
+          style={{
+            objectFit: 'cover',
+            pointerEvents: 'none', // Prevent video from capturing touch events
+            touchAction: 'none',
+            userSelect: 'none'
+          }}
+        />
 
-      <AnimatePresence mode="wait">
-        {!cameraActive ? (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.3 }}
-            key="start-screen">
-            <Card className="max-w-md mx-auto border-none shadow-lg overflow-hidden">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-2xl">
-                  Augmented Reality Scanner
-                </CardTitle>
-                <CardDescription>
-                  Scan QR codes at heritage sites to view 3D models and
-                  additional information.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col items-center space-y-6">
-                <div className="w-full aspect-video bg-muted rounded-xl flex items-center justify-center">
-                  <Camera className="h-16 w-16 text-muted-foreground/50" />
-                </div>
+        {/* Hidden canvas for QR scanning */}
+        <canvas ref={canvasRef} className="hidden" />
 
-                <div className="flex flex-col w-full gap-3">
-                  <Button
-                    onClick={requestCameraPermission}
-                    className="w-full rounded-full"
-                    disabled={isLoading}>
-                    <Camera className="mr-2 h-4 w-4" />
-                    Scan QR Code with Camera
-                  </Button>
+        {/* AR Overlay - 3D Models over Camera */}
+        {arMode && currentSite && cameraActive && (
+          <div className="absolute inset-0 z-20 rounded-2xl overflow-hidden">
+            <Canvas
+              style={{
+                width: '100%',
+                height: '100%',
+                touchAction: 'none',
+                userSelect: 'none'
+              }}
+              camera={{ position: [0, 0, 5], fov: 75 }}
+              gl={{
+                alpha: true,
+                antialias: true,
+                preserveDrawingBuffer: true
+              }}>
+              <PerspectiveCamera makeDefault position={[0, 0, 5]} fov={75} />
+              <ambientLight intensity={1.5} />
+              <directionalLight position={[10, 10, 5]} intensity={2.5} />
+              <pointLight position={[0, 5, 5]} intensity={1.0} />
 
-                  <Button
-                    onClick={triggerFileUpload}
-                    variant="outline"
-                    className="w-full rounded-full bg-transparent"
-                    disabled={isLoading}>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Upload QR Code Image
-                  </Button>
+              {/* 3D Model Overlay */}
+              <ARModelOverlay
+                url={currentSite.modelUrl || '/models/placeholder.glb'}
+                position={[0, 0, -2]}
+                scale={1.5}
+              />
 
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileUpload}
-                    accept="image/*"
-                    className="hidden"
-                  />
-                </div>
+              {/* OrbitControls for touch interaction */}
+              <OrbitControls
+                enableZoom={true}
+                enablePan={true}
+                enableRotate={true}
+                minDistance={2}
+                maxDistance={10}
+                target={[0, 0, 0]}
+                enableDamping={true}
+                dampingFactor={0.05}
+              />
+            </Canvas>
+          </div>
+        )}
 
-                {isLoading && (
-                  <div className="flex items-center justify-center gap-2 text-sm">
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                    <span>Processing...</span>
-                  </div>
-                )}
-
-                {error && (
-                  <div className="text-sm text-red-500 text-center px-4 py-2 bg-red-50 rounded-md w-full">
-                    {error}
-                  </div>
-                )}
-
-                {cameraPermission === 'denied' && (
-                  <div className="text-sm text-amber-600 text-center px-4 py-2 bg-amber-50 rounded-md w-full">
-                    Camera access is blocked. Please update your browser
-                    settings to allow camera access.
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.3 }}
-            key="camera-screen"
-            className="max-w-md mx-auto">
-            <div className="relative h-[70vh] w-full bg-black rounded-2xl overflow-hidden shadow-lg">
-              {/* Scanning overlay */}
-              <div className="absolute inset-0 pointer-events-none z-20">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-48 h-48 border-2 border-white/50 rounded-lg relative">
-                    <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-white"></div>
-                    <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-white"></div>
-                    <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-white"></div>
-                    <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-white"></div>
-                  </div>
+        {/* AR Mode Status Bar */}
+        {arMode && currentSite && (
+          <div className="absolute top-4 left-4 right-4 z-30 bg-black/70 text-white p-3 rounded-lg backdrop-blur-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Globe className="h-5 w-5 text-green-400" />
+                <div>
+                  <h3 className="font-semibold text-sm">{currentSite.name}</h3>
+                  <p className="text-xs text-gray-300">
+                    AR Mode Active - Touch to interact with 3D model
+                  </p>
                 </div>
               </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={exitArMode}
+                className="bg-white/20 hover:bg-white/30 text-white border-white/30">
+                Exit AR
+              </Button>
+            </div>
+          </div>
+        )}
 
-              {/* Loading indicator */}
-              {isLoading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/70 z-30">
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
-                    <p className="text-white">Activating camera...</p>
+        {/* Touch Instructions for AR Mode */}
+        {arMode && currentSite && (
+          <div className="absolute bottom-4 left-4 right-4 z-30">
+            <div className="bg-black/70 backdrop-blur-sm rounded-lg p-3 text-center">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <Hand className="h-4 w-4 text-blue-400" />
+                <span className="text-sm font-medium text-white">
+                  Touch Gestures
+                </span>
+              </div>
+              <div className="text-xs text-gray-300 space-y-1">
+                <div>
+                  • <strong>One finger:</strong> Move the 3D model
+                </div>
+                <div>
+                  • <strong>Two fingers:</strong> Rotate the model
+                </div>
+                <div>
+                  • <strong>Pinch:</strong> Zoom in/out
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Camera Controls */}
+        {cameraActive && (
+          <div className="absolute top-4 right-4 z-30">
+            <Button
+              size="icon"
+              variant="secondary"
+              onClick={stopCamera}
+              className="bg-black/50 hover:bg-black/70 text-white border-white/30 rounded-full">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+
+        {/* Loading indicator */}
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/70 z-40 rounded-2xl">
+            <div className="flex flex-col items-center gap-3">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+              <p className="text-white">Activating camera...</p>
+            </div>
+          </div>
+        )}
+
+        {/* Error Display */}
+        {error && (
+          <div className="absolute top-20 left-4 right-4 z-30">
+            <div className="bg-red-500/90 text-white px-4 py-3 rounded-lg text-center">
+              <p className="text-sm">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Main Content - Start Screen or Camera Interface */}
+        <AnimatePresence mode="wait">
+          {!cameraActive ? (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.3 }}
+              key="start-screen">
+              <Card className="max-w-md mx-auto border-none shadow-lg overflow-hidden">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-2xl">
+                    Augmented Reality Scanner
+                  </CardTitle>
+                  <CardDescription>
+                    Scan QR codes at heritage sites to view 3D models overlaid
+                    on the real world.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col items-center space-y-6">
+                  <div className="w-full aspect-video bg-muted rounded-xl flex items-center justify-center">
+                    <Camera className="h-16 w-16 text-muted-foreground/50" />
+                  </div>
+
+                  <div className="flex flex-col w-full gap-3">
+                    <Button
+                      onClick={requestCameraPermission}
+                      className="w-full rounded-full"
+                      disabled={isLoading}>
+                      <Camera className="mr-2 h-4 w-4" />
+                      Scan QR Code with Camera
+                    </Button>
+
+                    <Button
+                      onClick={triggerFileUpload}
+                      variant="outline"
+                      className="w-full rounded-full bg-transparent"
+                      disabled={isLoading}>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload QR Code Image
+                    </Button>
+
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileUpload}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                  </div>
+
+                  {isLoading && (
+                    <div className="flex items-center justify-center gap-2 text-sm">
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      <span>Processing...</span>
+                    </div>
+                  )}
+
+                  {cameraPermission === 'denied' && (
+                    <div className="text-sm text-amber-600 text-center px-4 py-2 bg-amber-50 rounded-md w-full">
+                      Camera access is blocked. Please update your browser
+                      settings to allow camera access.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.3 }}
+              key="camera-screen"
+              className="h-[70vh] w-full bg-black rounded-2xl overflow-hidden shadow-lg">
+              {/* Scanning overlay - only show when not in AR mode */}
+              {!arMode && (
+                <div className="absolute inset-0 pointer-events-none z-20">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-48 h-48 border-2 border-white/50 rounded-lg relative">
+                      <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-white"></div>
+                      <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-white"></div>
+                      <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-white"></div>
+                      <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-white"></div>
+                    </div>
+                  </div>
+
+                  <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 text-center">
+                    <p className="text-white text-sm bg-black/50 px-4 py-2 rounded-full">
+                      Position the QR code within the frame to scan
+                    </p>
                   </div>
                 </div>
               )}
-
-              {/* Close button */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute top-4 right-4 bg-black/50 text-white hover:bg-black/70 rounded-full z-30"
-                onClick={() => setCameraActive(false)}>
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <div className="mt-4 text-sm text-center text-muted-foreground">
-              <p>Position the QR code within the frame to scan</p>
-            </div>
-
-            {error && (
-              <div className="mt-4 text-sm text-red-500 text-center px-4 py-2 bg-red-50 rounded-md">
-                {error}
-              </div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
