@@ -500,28 +500,14 @@ export default function ARCameraPage() {
 
         <div className="h-[70vh] bg-black/5 rounded-2xl overflow-hidden shadow-lg">
           <Canvas
-            style={{
-              width: '100%',
-              height: '100%',
-              touchAction: 'none',
-              userSelect: 'none'
-            }}
-            camera={{ position: [0, 0, 5], fov: 75 }}
-            gl={{
-              alpha: true,
-              antialias: true,
-              preserveDrawingBuffer: true
-            }}>
+            style={{ width: '100%', height: '100%' }}
+            camera={{ position: [0, 0, 5], fov: 75 }}>
             <PerspectiveCamera makeDefault position={[0, 0, 5]} fov={75} />
             <ambientLight intensity={1.5} />
             <directionalLight position={[10, 10, 5]} intensity={2.5} />
             <pointLight position={[0, 5, 5]} intensity={1.0} />
 
-            <ARModelOverlay
-              url={site.modelUrl || '/models/placeholder.glb'}
-              position={[0, 0, 0]}
-              scale={1.5}
-            />
+            <ARModelOverlay url={site.modelUrl || '/models/placeholder.glb'} />
 
             <OrbitControls
               enableZoom={true}
@@ -648,7 +634,7 @@ export default function ARCameraPage() {
         )}
 
         {/* Touch Instructions for AR Mode */}
-        {/* {arMode && currentSite && (
+        {arMode && currentSite && (
           <div className="absolute bottom-4 left-4 right-4 z-30">
             <div className="bg-black/70 backdrop-blur-sm rounded-lg p-3 text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
@@ -670,7 +656,7 @@ export default function ARCameraPage() {
               </div>
             </div>
           </div>
-        )} */}
+        )}
 
         {/* Camera Controls */}
         {cameraActive && (
