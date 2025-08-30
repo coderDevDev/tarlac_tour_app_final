@@ -604,13 +604,13 @@ export default function ARCameraPage() {
                 touchAction: 'none',
                 userSelect: 'none'
               }}
-              camera={{ position: [0, 0, 5], fov: 75 }}
+              camera={{ position: [0, 0, 8], fov: 60 }}
               gl={{
                 alpha: true,
                 antialias: true,
                 preserveDrawingBuffer: true
               }}>
-              <PerspectiveCamera makeDefault position={[0, 0, 5]} fov={75} />
+              <PerspectiveCamera makeDefault position={[0, 0, 8]} fov={60} />
 
               {/* Enhanced Lighting Setup */}
               <ambientLight intensity={1.5} />
@@ -621,16 +621,16 @@ export default function ARCameraPage() {
               {/* 3D Model Overlay */}
               <ARModelOverlay
                 url={currentSite.modelUrl || '/models/placeholder.glb'}
-                position={[0, 0, -2]}
+                position={[0, 0, 0]}
                 scale={1.5}
               />
 
               {/* Debug Grid to help visualize 3D space */}
-              <gridHelper args={[10, 10, 0x444444, 0x888888]} />
+              <gridHelper args={[8, 8, 0x444444, 0x888888]} />
 
               {/* Subtle background elements for better AR visualization */}
-              <mesh position={[0, 0, -5]} rotation={[0, 0, 0]}>
-                <planeGeometry args={[20, 20]} />
+              <mesh position={[0, 0, -3]} rotation={[0, 0, 0]}>
+                <planeGeometry args={[16, 16]} />
                 <meshBasicMaterial color={0x000000} transparent opacity={0.1} />
               </mesh>
 
@@ -639,11 +639,13 @@ export default function ARCameraPage() {
                 enableZoom={true}
                 enablePan={true}
                 enableRotate={true}
-                minDistance={2}
-                maxDistance={10}
+                minDistance={3}
+                maxDistance={15}
                 target={[0, 0, 0]}
                 enableDamping={true}
                 dampingFactor={0.05}
+                maxPolarAngle={Math.PI / 1.5}
+                minPolarAngle={Math.PI / 6}
               />
 
               {/* AR Crosshair for better visual feedback */}
