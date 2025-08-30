@@ -52,8 +52,11 @@ function ARModelOverlay({
 }) {
   const { scene, animations } = useGLTF(url);
   const { actions, mixer } = useAnimations(animations, scene);
+  const meshRef = useRef<THREE.Mesh>(null);
+  const groupRef = useRef<THREE.Group>(null);
 
   useEffect(() => {
+    // Play the first animation if available
     if (animations.length > 0 && actions) {
       const firstAction = Object.values(actions)[0];
       if (firstAction) {
@@ -61,14 +64,39 @@ function ARModelOverlay({
       }
     }
 
+    // Pass ref back to parent when ready
+    if (groupRef.current) {
+      console.log('AR Model Overlay ready:', url);
+    }
+
     return () => {
       if (mixer) {
         mixer.stopAllAction();
       }
     };
-  }, [actions, animations, mixer]);
+  }, [actions, animations, mixer, url]);
 
-  return <primitive object={scene} position={position} scale={scale} />;
+  return (
+    <group ref={groupRef} position={position} scale={scale}>
+      <primitive
+        ref={meshRef}
+        object={scene}
+        onPointerOver={(e: any) => {
+          document.body.style.cursor = 'pointer';
+        }}
+        onPointerOut={(e: any) => {
+          document.body.style.cursor = 'default';
+        }}
+      />
+
+      {/* Simple indicator that model is ready */}
+      <Html position={[0, 1, 0]}>
+        <div className="bg-green-500/80 text-white px-2 py-1 rounded text-xs font-medium backdrop-blur-sm">
+          ✓ Model Ready
+        </div>
+      </Html>
+    </group>
+  );
 }
 
 export default function ARCameraPage() {
@@ -583,9 +611,12 @@ export default function ARCameraPage() {
                 preserveDrawingBuffer: true
               }}>
               <PerspectiveCamera makeDefault position={[0, 0, 5]} fov={75} />
+
+              {/* Enhanced Lighting Setup */}
               <ambientLight intensity={1.5} />
               <directionalLight position={[10, 10, 5]} intensity={2.5} />
               <pointLight position={[0, 5, 5]} intensity={1.0} />
+              <hemisphereLight args={[0xffffff, 0x444444, 0.8]} />
 
               {/* 3D Model Overlay */}
               <ARModelOverlay
@@ -593,6 +624,15 @@ export default function ARCameraPage() {
                 position={[0, 0, -2]}
                 scale={1.5}
               />
+
+              {/* Debug Grid to help visualize 3D space */}
+              <gridHelper args={[10, 10, 0x444444, 0x888888]} />
+
+              {/* Subtle background elements for better AR visualization */}
+              <mesh position={[0, 0, -5]} rotation={[0, 0, 0]}>
+                <planeGeometry args={[20, 20]} />
+                <meshBasicMaterial color={0x000000} transparent opacity={0.1} />
+              </mesh>
 
               {/* OrbitControls for touch interaction */}
               <OrbitControls
@@ -605,18 +645,34 @@ export default function ARCameraPage() {
                 enableDamping={true}
                 dampingFactor={0.05}
               />
+
+              {/* AR Crosshair for better visual feedback */}
+              <Html center>
+                <div className="w-16 h-16 border-2 border-white/30 rounded-full relative pointer-events-none">
+                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-white/50 rounded-full"></div>
+                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 border border-white/20 rounded-full"></div>
+                </div>
+              </Html>
             </Canvas>
           </div>
         )}
 
         {/* AR Mode Status Bar */}
         {arMode && currentSite && (
-          <div className="absolute top-4 left-4 right-4 z-30 bg-black/70 text-white p-3 rounded-lg backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="absolute top-4 left-4 right-4 z-30 bg-black/80 text-white p-4 rounded-xl backdrop-blur-md border border-white/20">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Globe className="h-5 w-5 text-green-400" />
+                <div className="p-2 bg-green-500/20 rounded-full border border-green-400/30">
+                  <Globe className="h-5 w-5 text-green-400" />
+                </div>
                 <div>
-                  <h3 className="font-semibold text-sm">{currentSite.name}</h3>
+                  <h3 className="font-semibold text-sm text-white">
+                    {currentSite.name}
+                  </h3>
                   <p className="text-xs text-gray-300">
                     AR Mode Active - Touch to interact with 3D model
                   </p>
@@ -626,36 +682,51 @@ export default function ARCameraPage() {
                 size="sm"
                 variant="outline"
                 onClick={exitArMode}
-                className="bg-white/20 hover:bg-white/30 text-white border-white/30">
+                className="bg-white/20 hover:bg-white/30 text-white border-white/30 hover:bg-white/30 transition-colors">
                 Exit AR
               </Button>
             </div>
-          </div>
+          </motion.div>
         )}
 
         {/* Touch Instructions for AR Mode */}
         {arMode && currentSite && (
-          <div className="absolute bottom-4 left-4 right-4 z-30">
-            <div className="bg-black/70 backdrop-blur-sm rounded-lg p-3 text-center">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <Hand className="h-4 w-4 text-blue-400" />
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="absolute bottom-4 left-4 right-4 z-30">
+            <div className="bg-black/80 backdrop-blur-md rounded-xl p-4 text-center border border-white/20">
+              <div className="flex items-center justify-center gap-2 mb-3">
+                <div className="p-2 bg-blue-500/20 rounded-full border border-blue-400/30">
+                  <Hand className="h-4 w-4 text-blue-400" />
+                </div>
                 <span className="text-sm font-medium text-white">
                   Touch Gestures
                 </span>
               </div>
-              <div className="text-xs text-gray-300 space-y-1">
-                <div>
-                  • <strong>One finger:</strong> Move the 3D model
+              <div className="text-xs text-gray-300 space-y-2">
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                  <span>
+                    <strong>One finger:</strong> Move the 3D model
+                  </span>
                 </div>
-                <div>
-                  • <strong>Two fingers:</strong> Rotate the model
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                  <span>
+                    <strong>Two fingers:</strong> Rotate the model
+                  </span>
                 </div>
-                <div>
-                  • <strong>Pinch:</strong> Zoom in/out
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                  <span>
+                    <strong>Pinch:</strong> Zoom in/out
+                  </span>
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
 
         {/* Camera Controls */}
