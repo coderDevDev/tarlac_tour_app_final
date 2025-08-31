@@ -796,14 +796,14 @@ export default function ARCameraPage() {
                       Scan QR Code with Camera
                     </Button>
 
-                    <Button
+                    {/* <Button
                       onClick={triggerFileUpload}
                       variant="outline"
                       className="w-full rounded-full bg-transparent"
                       disabled={isLoading}>
                       <Upload className="mr-2 h-4 w-4" />
                       Upload QR Code Image
-                    </Button>
+                    </Button> */}
 
                     <input
                       type="file"
