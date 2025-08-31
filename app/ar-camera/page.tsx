@@ -295,7 +295,7 @@ export default function ARCameraPage() {
   // Start scanning for QR codes
   const startQrScanning = async () => {
     setScanning(true);
-    console.log('Starting QR code scanning');
+    console.log('Starting enhanced QR code scanning');
 
     try {
       let jsQR: any;
@@ -317,7 +317,23 @@ export default function ARCameraPage() {
         window.qrScanInterval = null;
       }
 
+      // Enhanced scanning with multiple strategies
+      let lastScanTime = 0;
+      let consecutiveFailures = 0;
+      let scanAttempts = 0;
+      let lastFrameTime = 0;
+      const targetFPS = 10; // Limit to 10 FPS for better performance
+      const frameInterval = 1000 / targetFPS;
+
       window.qrScanInterval = setInterval(() => {
+        const now = Date.now();
+
+        // Frame rate limiting for better performance
+        if (now - lastFrameTime < frameInterval) {
+          return;
+        }
+        lastFrameTime = now;
+
         if (videoRef.current && canvasRef.current) {
           const canvas = canvasRef.current;
           const video = videoRef.current;
@@ -327,44 +343,164 @@ export default function ARCameraPage() {
             const videoHeight = video.videoHeight;
 
             if (videoWidth && videoHeight) {
-              canvas.width = videoWidth;
-              canvas.height = videoHeight;
+              // Optimize canvas size for better performance
+              const targetWidth = Math.min(videoWidth, 640);
+              const targetHeight = Math.min(videoHeight, 480);
+
+              // Only resize canvas if dimensions changed
+              if (
+                canvas.width !== targetWidth ||
+                canvas.height !== targetHeight
+              ) {
+                canvas.width = targetWidth;
+                canvas.height = targetHeight;
+              }
 
               const ctx = canvas.getContext('2d');
               if (ctx) {
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                // Enhanced image processing for better QR detection
+                ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
 
-                const imageData = ctx.getImageData(
-                  0,
-                  0,
-                  canvas.width,
-                  canvas.height
-                );
+                // Try multiple scanning strategies
+                const strategies = [
+                  // Strategy 1: Full image scan
+                  () => {
+                    const imageData = ctx.getImageData(
+                      0,
+                      0,
+                      targetWidth,
+                      targetHeight
+                    );
+                    return jsQR(
+                      imageData.data,
+                      imageData.width,
+                      imageData.height,
+                      {
+                        inversionAttempts: 'dontInvert'
+                      }
+                    );
+                  },
+                  // Strategy 2: Center region scan (most common QR placement)
+                  () => {
+                    const centerX = Math.floor(targetWidth / 2);
+                    const centerY = Math.floor(targetHeight / 2);
+                    const regionSize = Math.min(targetWidth, targetHeight) / 2;
 
-                if (jsQR && typeof jsQR === 'function') {
-                  const code = jsQR(
-                    imageData.data,
-                    imageData.width,
-                    imageData.height,
-                    {
-                      inversionAttempts: 'dontInvert'
+                    const x = Math.max(0, centerX - regionSize / 2);
+                    const y = Math.max(0, centerY - regionSize / 2);
+                    const width = Math.min(regionSize, targetWidth - x);
+                    const height = Math.min(regionSize, targetHeight - y);
+
+                    const imageData = ctx.getImageData(x, y, width, height);
+                    return jsQR(
+                      imageData.data,
+                      imageData.width,
+                      imageData.height,
+                      {
+                        inversionAttempts: 'dontInvert'
+                      }
+                    );
+                  },
+                  // Strategy 3: Multiple smaller regions for better coverage
+                  () => {
+                    const regions = [
+                      { x: 0, y: 0, w: targetWidth / 2, h: targetHeight / 2 },
+                      {
+                        x: targetWidth / 2,
+                        y: 0,
+                        w: targetWidth / 2,
+                        h: targetHeight / 2
+                      },
+                      {
+                        x: 0,
+                        y: targetHeight / 2,
+                        w: targetWidth / 2,
+                        h: targetHeight / 2
+                      },
+                      {
+                        x: targetWidth / 2,
+                        y: targetHeight / 2,
+                        w: targetWidth / 2,
+                        h: targetHeight / 2
+                      }
+                    ];
+
+                    for (const region of regions) {
+                      const imageData = ctx.getImageData(
+                        region.x,
+                        region.y,
+                        region.w,
+                        region.h
+                      );
+                      const code = jsQR(
+                        imageData.data,
+                        imageData.width,
+                        imageData.height,
+                        {
+                          inversionAttempts: 'dontInvert'
+                        }
+                      );
+                      if (code) return code;
                     }
-                  );
+                    return null;
+                  }
+                ];
 
-                  if (code) {
-                    console.log('QR code detected:', code.data);
+                // Try each strategy until we find a QR code
+                let code = null;
+                for (const strategy of strategies) {
+                  try {
+                    code = strategy();
+                    if (code) break;
+                  } catch (err) {
+                    console.warn('Strategy failed:', err);
+                    continue;
+                  }
+                }
+
+                if (code) {
+                  const now = Date.now();
+                  scanAttempts++;
+
+                  // Prevent duplicate scans within 1 second
+                  if (now - lastScanTime > 1000) {
+                    console.log(
+                      'QR code detected:',
+                      code.data,
+                      'in',
+                      scanAttempts,
+                      'attempts'
+                    );
+                    lastScanTime = now;
+                    consecutiveFailures = 0;
                     processQrCode(code.data);
+                  }
+                } else {
+                  consecutiveFailures++;
+                  scanAttempts++;
+
+                  // Adaptive scanning frequency based on failure rate
+                  if (consecutiveFailures > 50) {
+                    // Slow down scanning if we're not finding anything
+                    clearInterval(window.qrScanInterval!);
+                    window.qrScanInterval = setInterval(() => {
+                      // Restart with faster scanning
+                      consecutiveFailures = 0;
+                      startQrScanning();
+                    }, 1000);
                   }
                 }
               }
             }
           }
         }
-      }, 200);
+      }, 100); // Increased frequency from 200ms to 100ms for faster detection
+
+      console.log('Enhanced QR scanning started with 100ms intervals');
     } catch (err) {
-      console.error('Error starting QR scanning:', err);
+      console.error('Error starting enhanced QR scanning:', err);
       setError(
-        'Failed to initialize QR scanner. Please try uploading an image instead.'
+        'Failed to initialize enhanced QR scanner. Please try uploading an image instead.'
       );
       setScanning(false);
     }
@@ -395,30 +531,116 @@ export default function ARCameraPage() {
         img.onload = resolve;
       });
 
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-      if (!context) {
-        throw new Error('Could not get canvas context');
+      // Enhanced image processing with multiple strategies
+      const strategies = [
+        // Strategy 1: Full image scan
+        () => {
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          if (!context) return null;
+
+          canvas.width = img.width;
+          canvas.height = img.height;
+          context.drawImage(img, 0, 0);
+
+          const imageData = context.getImageData(
+            0,
+            0,
+            canvas.width,
+            canvas.height
+          );
+          return jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: 'dontInvert'
+          });
+        },
+        // Strategy 2: Optimized size for better performance
+        () => {
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          if (!context) return null;
+
+          // Optimize canvas size for better QR detection
+          const maxSize = 1024;
+          const scale = Math.min(maxSize / img.width, maxSize / img.height);
+          const targetWidth = Math.floor(img.width * scale);
+          const targetHeight = Math.floor(img.height * scale);
+
+          canvas.width = targetWidth;
+          canvas.height = targetHeight;
+          context.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+          const imageData = context.getImageData(
+            0,
+            0,
+            targetWidth,
+            targetHeight
+          );
+          return jsQR(imageData.data, targetWidth, targetHeight, {
+            inversionAttempts: 'dontInvert'
+          });
+        },
+        // Strategy 3: Multiple region scans for better coverage
+        () => {
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          if (!context) return null;
+
+          canvas.width = img.width;
+          canvas.height = img.height;
+          context.drawImage(img, 0, 0);
+
+          // Try different regions of the image
+          const regions = [
+            { x: 0, y: 0, w: img.width, h: img.height }, // Full image
+            {
+              x: img.width * 0.1,
+              y: img.height * 0.1,
+              w: img.width * 0.8,
+              h: img.height * 0.8
+            }, // Center 80%
+            {
+              x: img.width * 0.2,
+              y: img.height * 0.2,
+              w: img.width * 0.6,
+              h: img.height * 0.6
+            } // Center 60%
+          ];
+
+          for (const region of regions) {
+            const imageData = context.getImageData(
+              region.x,
+              region.y,
+              region.w,
+              region.h
+            );
+            const code = jsQR(imageData.data, region.w, region.h, {
+              inversionAttempts: 'dontInvert'
+            });
+            if (code) return code;
+          }
+          return null;
+        }
+      ];
+
+      // Try each strategy until we find a QR code
+      let code = null;
+      for (const strategy of strategies) {
+        try {
+          code = strategy();
+          if (code) break;
+        } catch (err) {
+          console.warn('Strategy failed:', err);
+          continue;
+        }
       }
 
-      canvas.width = img.width;
-      canvas.height = img.height;
-      context.drawImage(img, 0, 0);
-
-      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-
-      if (jsQR && typeof jsQR === 'function') {
-        const code = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: 'dontInvert'
-        });
-
-        if (code) {
-          processQrCode(code.data);
-        } else {
-          setError('No QR code found in the image. Please try another image.');
-        }
+      if (code) {
+        console.log('QR code detected in uploaded image:', code.data);
+        processQrCode(code.data);
       } else {
-        throw new Error('QR scanner not available');
+        setError(
+          'No QR code found in the image. Please try another image or ensure the QR code is clearly visible.'
+        );
       }
     } catch (err) {
       console.error('Error processing image:', err);
@@ -961,13 +1183,37 @@ export default function ARCameraPage() {
                       <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-white"></div>
                       <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-white"></div>
                       <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-white"></div>
+
+                      {/* Enhanced scanning indicator */}
+                      {scanning && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-32 h-32 border-2 border-blue-400/60 rounded-lg relative animate-pulse">
+                            <div className="absolute inset-0 border-2 border-blue-300/40 rounded-lg animate-ping"></div>
+                            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                              <div className="w-3 h-3 bg-blue-400 rounded-full animate-bounce"></div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 text-center">
-                    <p className="text-white text-sm bg-black/50 px-4 py-2 rounded-full">
-                      Position the QR code within the frame to scan
-                    </p>
+                    <div className="bg-black/50 backdrop-blur-sm px-6 py-3 rounded-full">
+                      <p className="text-white text-sm font-medium">
+                        {scanning
+                          ? 'Scanning for QR codes...'
+                          : 'Position QR code in frame'}
+                      </p>
+                      {scanning && (
+                        <div className="flex items-center justify-center gap-2 mt-2">
+                          <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                          <span className="text-xs text-blue-300">
+                            Active scanning
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
