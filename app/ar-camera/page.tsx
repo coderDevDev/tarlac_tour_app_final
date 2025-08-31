@@ -44,11 +44,15 @@ declare global {
 function ARModelOverlay({
   url,
   position = [0, 0, 0],
-  scale = 1.5
+  scale = 1.5,
+  onModelReady,
+  onModelLoading
 }: {
   url: string;
   position?: [number, number, number];
   scale?: number;
+  onModelReady?: () => void;
+  onModelLoading?: () => void;
 }) {
   const { scene, animations } = useGLTF(url);
   const { actions, mixer } = useAnimations(animations, scene);
@@ -56,6 +60,9 @@ function ARModelOverlay({
   const groupRef = useRef<THREE.Group>(null);
 
   useEffect(() => {
+    // Notify parent that model is loading
+    onModelLoading?.();
+
     // Play the first animation if available
     if (animations.length > 0 && actions) {
       const firstAction = Object.values(actions)[0];
@@ -67,6 +74,8 @@ function ARModelOverlay({
     // Pass ref back to parent when ready
     if (groupRef.current) {
       console.log('AR Model Overlay ready:', url);
+      // Notify parent that model is ready
+      onModelReady?.();
     }
 
     return () => {
@@ -74,7 +83,7 @@ function ARModelOverlay({
         mixer.stopAllAction();
       }
     };
-  }, [actions, animations, mixer, url]);
+  }, [actions, animations, mixer, url, onModelReady, onModelLoading]);
 
   return (
     <group ref={groupRef} position={position} scale={scale}>
@@ -112,6 +121,8 @@ export default function ARCameraPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [arMode, setArMode] = useState(false); // New: AR overlay mode
   const [currentSite, setCurrentSite] = useState<any>(null); // New: Current site for AR
+  const [modelLoading, setModelLoading] = useState(false); // New: Model loading state
+  const [modelReady, setModelReady] = useState(false); // New: Model ready state
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -456,6 +467,10 @@ export default function ARCameraPage() {
           setCurrentSite(site);
           setArMode(true);
 
+          // Set model loading state
+          setModelLoading(true);
+          setModelReady(false);
+
           // Show success message
           setError(null);
         } else {
@@ -507,6 +522,8 @@ export default function ARCameraPage() {
   const exitArMode = () => {
     setArMode(false);
     setCurrentSite(null);
+    setModelLoading(false);
+    setModelReady(false);
     setScanning(true);
     startQrScanning();
   };
@@ -597,6 +614,25 @@ export default function ARCameraPage() {
         {/* AR Overlay - 3D Models over Camera */}
         {arMode && currentSite && cameraActive && (
           <div className="absolute inset-0 z-20 rounded-2xl overflow-hidden">
+            {/* Model Loading Overlay */}
+            {modelLoading && !modelReady && (
+              <div className="absolute inset-0 bg-black/70 z-30 flex items-center justify-center">
+                <div className="text-center text-white">
+                  <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
+                  <h3 className="text-lg font-semibold mb-2">
+                    Loading 3D Model
+                  </h3>
+                  <p className="text-sm text-gray-300 max-w-xs">
+                    Preparing {currentSite.name} for AR experience...
+                  </p>
+                  <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-400">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                    <span>Loading model assets...</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <Canvas
               style={{
                 width: '100%',
@@ -623,6 +659,11 @@ export default function ARCameraPage() {
                 url={currentSite.modelUrl || '/models/placeholder.glb'}
                 position={[0, 0, 0]}
                 scale={1.5}
+                onModelLoading={() => setModelLoading(true)}
+                onModelReady={() => {
+                  setModelLoading(false);
+                  setModelReady(true);
+                }}
               />
 
               {/* Debug Grid to help visualize 3D space */}
@@ -668,15 +709,26 @@ export default function ARCameraPage() {
             className="absolute top-4 left-4 right-4 z-30 bg-black/80 text-white p-4 rounded-xl backdrop-blur-md border border-white/20">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-500/20 rounded-full border border-green-400/30">
-                  <Globe className="h-5 w-5 text-green-400" />
+                <div
+                  className={`p-2 rounded-full border ${
+                    modelReady
+                      ? 'bg-green-500/20 border-green-400/30'
+                      : 'bg-blue-500/20 border-blue-400/30'
+                  }`}>
+                  {modelReady ? (
+                    <Globe className="h-5 w-5 text-green-400" />
+                  ) : (
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-400"></div>
+                  )}
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm text-white">
                     {currentSite.name}
                   </h3>
                   <p className="text-xs text-gray-300">
-                    AR Mode Active - Touch to interact with 3D model
+                    {modelReady
+                      ? 'AR Mode Active - Touch to interact with 3D model'
+                      : 'Loading 3D model...'}
                   </p>
                 </div>
               </div>
@@ -702,6 +754,68 @@ export default function ARCameraPage() {
               <div className="flex items-center justify-center gap-2 mb-3">
                 <div className="p-2 bg-blue-500/20 rounded-full border border-blue-400/30">
                   <Hand className="h-4 w-4 text-blue-400" />
+                </div>
+                <span className="text-sm font-medium text-white">
+                  Touch Gestures
+                </span>
+              </div>
+              <div className="text-xs text-gray-300 space-y-2">
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                  <span>
+                    <strong>One finger:</strong> Move the 3D model
+                  </span>
+                </div>
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                  <span>
+                    <strong>Two fingers:</strong> Rotate the model
+                  </span>
+                </div>
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                  <span>
+                    <strong>Pinch:</strong> Zoom in/out
+                  </span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )} */}
+
+        {/* Model Loading Status - Bottom Center */}
+        {arMode && currentSite && modelLoading && !modelReady && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="absolute bottom-4 left-4 right-4 z-30">
+            <div className="bg-blue-500/90 backdrop-blur-md rounded-xl p-4 text-center border border-blue-400/30">
+              <div className="flex items-center justify-center gap-3 mb-2">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                <span className="text-sm font-medium text-white">
+                  Loading 3D Model
+                </span>
+              </div>
+              <p className="text-xs text-blue-100">
+                Please wait while we prepare {currentSite.name} for AR
+                experience...
+              </p>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Touch Instructions - Only show when model is ready */}
+        {/* {arMode && currentSite && modelReady && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="absolute bottom-4 left-4 right-4 z-30">
+            <div className="bg-black/80 backdrop-blur-md rounded-xl p-4 text-center border border-white/20">
+              <div className="flex items-center justify-center gap-2 mb-3">
+                <div className="p-2 bg-green-500/20 rounded-full border border-green-400/30">
+                  <Hand className="h-4 w-4 text-green-400" />
                 </div>
                 <span className="text-sm font-medium text-white">
                   Touch Gestures
