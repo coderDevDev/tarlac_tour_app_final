@@ -692,7 +692,7 @@ export default function ARCameraPage() {
         )}
 
         {/* Touch Instructions for AR Mode */}
-        {arMode && currentSite && (
+        {/* {arMode && currentSite && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -729,7 +729,7 @@ export default function ARCameraPage() {
               </div>
             </div>
           </motion.div>
-        )}
+        )} */}
 
         {/* Camera Controls */}
         {cameraActive && (
