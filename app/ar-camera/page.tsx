@@ -911,7 +911,8 @@ export default function ARCameraPage() {
             objectFit: 'cover',
             pointerEvents: 'none', // Prevent video from capturing touch events
             touchAction: 'none',
-            userSelect: 'none'
+            userSelect: 'none',
+            backgroundColor: 'transparent'
           }}
         />
 
@@ -921,6 +922,10 @@ export default function ARCameraPage() {
         {/* AR Overlay - 3D Models over Camera */}
         {arMode && currentSite && cameraActive && (
           <div className="absolute inset-0 z-20 rounded-2xl overflow-hidden">
+            {/* Debug: Camera visibility indicator */}
+            <div className="absolute top-2 left-2 z-40 bg-green-500/80 text-white px-2 py-1 rounded text-xs">
+              Camera Active: {cameraActive ? 'Yes' : 'No'}
+            </div>
             {/* Model Loading Overlay */}
             {modelLoading && !modelReady && (
               <div className="absolute inset-0 bg-black/70 z-30 flex items-center justify-center">
@@ -945,13 +950,15 @@ export default function ARCameraPage() {
                 width: '100%',
                 height: '100%',
                 touchAction: 'none',
-                userSelect: 'none'
+                userSelect: 'none',
+                background: 'transparent'
               }}
               camera={{ position: [0, 0, 8], fov: 60 }}
               gl={{
                 alpha: true,
                 antialias: true,
-                preserveDrawingBuffer: true
+                preserveDrawingBuffer: true,
+                background: 'transparent'
               }}>
               <PerspectiveCamera makeDefault position={[0, 0, 8]} fov={60} />
 
@@ -960,6 +967,9 @@ export default function ARCameraPage() {
               <directionalLight position={[10, 10, 5]} intensity={2.5} />
               <pointLight position={[0, 5, 5]} intensity={1.0} />
               <hemisphereLight args={[0xffffff, 0x444444, 0.8]} />
+
+              {/* Ensure no background color */}
+              <color attach="background" args={['transparent']} />
 
               {/* 3D Model Overlay */}
               <ARModelOverlay
@@ -973,14 +983,10 @@ export default function ARCameraPage() {
                 }}
               />
 
-              {/* Debug Grid to help visualize 3D space */}
-              <gridHelper args={[8, 8, 0x444444, 0x888888]} />
+              {/* Debug Grid to help visualize 3D space - made more subtle */}
+              <gridHelper args={[8, 8, 0x444444, 0x666666]} />
 
-              {/* Subtle background elements for better AR visualization */}
-              <mesh position={[0, 0, -3]} rotation={[0, 0, 0]}>
-                <planeGeometry args={[16, 16]} />
-                <meshBasicMaterial color={0x000000} transparent opacity={0.1} />
-              </mesh>
+              {/* Removed background mesh to ensure camera feed is visible */}
 
               {/* OrbitControls for touch interaction */}
               <OrbitControls
