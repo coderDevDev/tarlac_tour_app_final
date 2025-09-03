@@ -911,8 +911,7 @@ export default function ARCameraPage() {
             objectFit: 'cover',
             pointerEvents: 'none', // Prevent video from capturing touch events
             touchAction: 'none',
-            userSelect: 'none',
-            backgroundColor: 'transparent'
+            userSelect: 'none'
           }}
         />
 
@@ -922,10 +921,6 @@ export default function ARCameraPage() {
         {/* AR Overlay - 3D Models over Camera */}
         {arMode && currentSite && cameraActive && (
           <div className="absolute inset-0 z-20 rounded-2xl overflow-hidden">
-            {/* Debug: Camera visibility indicator */}
-            <div className="absolute top-2 left-2 z-40 bg-green-500/80 text-white px-2 py-1 rounded text-xs">
-              Camera Active: {cameraActive ? 'Yes' : 'No'}
-            </div>
             {/* Model Loading Overlay */}
             {modelLoading && !modelReady && (
               <div className="absolute inset-0 bg-black/70 z-30 flex items-center justify-center">
@@ -950,15 +945,13 @@ export default function ARCameraPage() {
                 width: '100%',
                 height: '100%',
                 touchAction: 'none',
-                userSelect: 'none',
-                background: 'transparent'
+                userSelect: 'none'
               }}
               camera={{ position: [0, 0, 8], fov: 60 }}
               gl={{
                 alpha: true,
                 antialias: true,
-                preserveDrawingBuffer: true,
-                background: 'transparent'
+                preserveDrawingBuffer: true
               }}>
               <PerspectiveCamera makeDefault position={[0, 0, 8]} fov={60} />
 
@@ -967,9 +960,6 @@ export default function ARCameraPage() {
               <directionalLight position={[10, 10, 5]} intensity={2.5} />
               <pointLight position={[0, 5, 5]} intensity={1.0} />
               <hemisphereLight args={[0xffffff, 0x444444, 0.8]} />
-
-              {/* Ensure no background color */}
-              <color attach="background" args={['transparent']} />
 
               {/* 3D Model Overlay */}
               <ARModelOverlay
@@ -983,10 +973,14 @@ export default function ARCameraPage() {
                 }}
               />
 
-              {/* Debug Grid to help visualize 3D space - made more subtle */}
-              <gridHelper args={[8, 8, 0x444444, 0x666666]} />
+              {/* Debug Grid to help visualize 3D space */}
+              <gridHelper args={[8, 8, 0x444444, 0x888888]} />
 
-              {/* Removed background mesh to ensure camera feed is visible */}
+              {/* Subtle background elements for better AR visualization */}
+              <mesh position={[0, 0, -3]} rotation={[0, 0, 0]}>
+                <planeGeometry args={[16, 16]} />
+                <meshBasicMaterial color={0x000000} transparent opacity={0.1} />
+              </mesh>
 
               {/* OrbitControls for touch interaction */}
               <OrbitControls
@@ -1284,34 +1278,16 @@ export default function ARCameraPage() {
                       <p>Site: {site.name}</p>
                       <p>Camera Active: {cameraActive ? 'Yes' : 'No'}</p>
                       <p>AR Mode: {arMode ? 'Yes' : 'No'}</p>
-                      <p>Model Loading: {modelLoading ? 'Yes' : 'No'}</p>
-                      <p>Model Ready: {modelReady ? 'Yes' : 'No'}</p>
-                      <div className="flex gap-2 mt-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            console.log('Manual camera start clicked');
-                            setCameraActive(true);
-                          }}
-                          className="text-xs">
-                          Start Camera
-                        </Button>
-                        {cameraActive && !arMode && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              console.log('Manual AR mode start clicked');
-                              setArMode(true);
-                              setModelLoading(true);
-                              setModelReady(false);
-                            }}
-                            className="text-xs">
-                            Start AR
-                          </Button>
-                        )}
-                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          console.log('Manual camera start clicked');
+                          setCameraActive(true);
+                        }}
+                        className="mt-2">
+                        Force Start Camera
+                      </Button>
                     </div>
                   )}
 
