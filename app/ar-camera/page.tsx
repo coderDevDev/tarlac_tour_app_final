@@ -160,34 +160,45 @@ export default function ARCameraPage() {
       console.log(
         'SiteId provided, auto-starting camera and AR mode for direct AR experience'
       );
-      // Small delay to ensure component is fully mounted
-      setTimeout(() => {
-        console.log('Auto-starting camera for site:', site.name);
-        autoStartCamera();
-        // Also enable AR mode directly since we have the site
-        setCurrentSite(site);
-        setArMode(true);
-        setModelLoading(true);
-        setModelReady(false);
-        console.log('Auto-enabled AR mode for site:', site.name);
-      }, 1000); // Increased delay to ensure everything is ready
+      console.log('Site data:', site);
+      console.log('SiteId:', siteId);
+
+      // Immediately start camera and AR mode for direct AR experience
+      console.log('Auto-starting camera for site:', site.name);
+      autoStartCamera();
+      // Also enable AR mode directly since we have the site
+      setCurrentSite(site);
+      setArMode(true);
+      setModelLoading(true);
+      setModelReady(false);
+      console.log('Auto-enabled AR mode for site:', site.name);
     }
   }, [siteId, site]);
 
   // Handle camera activation - consolidated logic
   useEffect(() => {
+    console.log(
+      'Camera activation useEffect triggered, cameraActive:',
+      cameraActive
+    );
     if (cameraActive) {
       console.log('Camera activation requested, starting camera...');
       const timer = setTimeout(() => {
+        console.log('Timer fired, calling startCamera()');
         startCamera();
       }, 100);
 
-      return () => clearTimeout(timer);
+      return () => {
+        console.log('Clearing camera start timer');
+        clearTimeout(timer);
+      };
     } else {
+      console.log('Camera not active, stopping camera');
       stopCamera();
     }
 
     return () => {
+      console.log('Camera activation useEffect cleanup');
       stopCamera();
     };
   }, [cameraActive]);
@@ -757,7 +768,39 @@ export default function ARCameraPage() {
   const autoStartCamera = async () => {
     try {
       console.log('Auto-starting camera for direct AR experience...');
-      setCameraActive(true);
+
+      // First try to get camera permission directly
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        try {
+          console.log('Requesting camera permission directly...');
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: 'environment',
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            },
+            audio: false
+          });
+
+          console.log('Camera permission granted, setting up video...');
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            streamRef.current = stream;
+            setCameraPermission('granted');
+            setCameraActive(true);
+            console.log('Camera auto-started successfully');
+          }
+        } catch (permissionError) {
+          console.log(
+            'Direct permission request failed, falling back to normal flow:',
+            permissionError
+          );
+          setCameraActive(true);
+        }
+      } else {
+        console.log('MediaDevices not available, using normal flow');
+        setCameraActive(true);
+      }
     } catch (err) {
       console.error('Error auto-starting camera:', err);
       setError('Failed to auto-start camera. Please try manually.');
@@ -1141,7 +1184,7 @@ export default function ARCameraPage() {
                   </CardTitle>
                   <CardDescription>
                     {siteId && site
-                      ? `Loading AR experience for ${site.name}. Camera will start automatically.`
+                      ? `Starting AR experience for ${site.name}. Camera is activating...`
                       : 'Scan QR codes at heritage sites to view 3D models overlaid on the real world.'}
                   </CardDescription>
                 </CardHeader>
@@ -1151,19 +1194,30 @@ export default function ARCameraPage() {
                   </div>
 
                   <div className="flex flex-col w-full gap-3">
-                    <Button
-                      onClick={
-                        siteId && site
-                          ? autoStartCamera
-                          : requestCameraPermission
-                      }
-                      className="w-full rounded-full"
-                      disabled={isLoading}>
-                      <Camera className="mr-2 h-4 w-4" />
-                      {siteId && site
-                        ? 'Start AR Experience'
-                        : 'Scan QR Code with Camera'}
-                    </Button>
+                    {siteId && site ? (
+                      <div className="text-center">
+                        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mb-3">
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                          <span>Initializing AR Experience...</span>
+                        </div>
+                        <Button
+                          onClick={autoStartCamera}
+                          variant="outline"
+                          className="w-full rounded-full"
+                          disabled={isLoading}>
+                          <Camera className="mr-2 h-4 w-4" />
+                          Retry Camera Start
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        onClick={requestCameraPermission}
+                        className="w-full rounded-full"
+                        disabled={isLoading}>
+                        <Camera className="mr-2 h-4 w-4" />
+                        Scan QR Code with Camera
+                      </Button>
+                    )}
 
                     {/* <Button
                       onClick={triggerFileUpload}
@@ -1188,9 +1242,28 @@ export default function ARCameraPage() {
                       <RefreshCw className="h-4 w-4 animate-spin" />
                       <span>
                         {siteId && site && !cameraActive
-                          ? 'Starting AR Experience...'
+                          ? 'Activating Camera & AR Mode...'
                           : 'Processing...'}
                       </span>
+                    </div>
+                  )}
+
+                  {/* Debug info for auto-start */}
+                  {siteId && site && (
+                    <div className="text-xs text-muted-foreground text-center p-2 bg-muted/50 rounded">
+                      <p>Site: {site.name}</p>
+                      <p>Camera Active: {cameraActive ? 'Yes' : 'No'}</p>
+                      <p>AR Mode: {arMode ? 'Yes' : 'No'}</p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          console.log('Manual camera start clicked');
+                          setCameraActive(true);
+                        }}
+                        className="mt-2">
+                        Force Start Camera
+                      </Button>
                     </div>
                   )}
 
