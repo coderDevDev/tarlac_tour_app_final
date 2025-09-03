@@ -33,7 +33,7 @@ export default function SitePage() {
   useEffect(() => {
     if (id) {
       const siteData = getSiteById(id.toString());
-      setSite(siteData);
+      setSite(siteData || null);
       setLoading(false);
     }
   }, [id]);

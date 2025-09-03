@@ -162,32 +162,25 @@ export default function ARCameraPage() {
       );
       // Small delay to ensure component is fully mounted
       setTimeout(() => {
-        setCameraActive(true);
+        console.log('Auto-starting camera for site:', site.name);
+        autoStartCamera();
         // Also enable AR mode directly since we have the site
         setCurrentSite(site);
         setArMode(true);
         setModelLoading(true);
         setModelReady(false);
         console.log('Auto-enabled AR mode for site:', site.name);
-      }, 500);
+      }, 1000); // Increased delay to ensure everything is ready
     }
   }, [siteId, site]);
 
-  useEffect(() => {
-    console.log('Camera permission status:', cameraPermission);
-
-    if (cameraPermission === 'granted' && cameraActive && !streamRef.current) {
-      console.log('Permission granted, starting camera');
-      startCamera();
-    }
-  }, [cameraPermission, cameraActive]);
-
-  // Handle camera activation
+  // Handle camera activation - consolidated logic
   useEffect(() => {
     if (cameraActive) {
+      console.log('Camera activation requested, starting camera...');
       const timer = setTimeout(() => {
         startCamera();
-      }, 50);
+      }, 100);
 
       return () => clearTimeout(timer);
     } else {
@@ -201,6 +194,7 @@ export default function ARCameraPage() {
 
   // Start the camera
   const startCamera = async () => {
+    console.log('startCamera called - setting up camera...');
     setError(null);
     setIsLoading(true);
 
@@ -219,6 +213,8 @@ export default function ARCameraPage() {
           throw new Error('Video element not found');
         }
       }
+
+      console.log('Video element found, requesting camera access...');
 
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
@@ -677,17 +673,17 @@ export default function ARCameraPage() {
     try {
       let extractedSiteId: string | null = null;
 
-      if (data.includes('/ar-world?siteId=')) {
+      if (data.includes('/ar-camera?siteId=')) {
         try {
           const url = new URL(data);
           extractedSiteId = url.searchParams.get('siteId');
         } catch (e) {
-          const match = data.match(/\/ar-world\?siteId=([^&]+)/);
+          const match = data.match(/\/ar-camera\?siteId=([^&]+)/);
           if (match && match[1]) {
             extractedSiteId = match[1];
           }
         }
-      } else if (data.startsWith('/ar-world?siteId=')) {
+      } else if (data.startsWith('/ar-camera?siteId=')) {
         const params = new URLSearchParams(data.split('?')[1]);
         extractedSiteId = params.get('siteId');
       } else if (validSiteIds.includes(data)) {
@@ -754,6 +750,17 @@ export default function ARCameraPage() {
     } catch (err) {
       console.error('Error requesting camera permission:', err);
       setError('Failed to request camera permission. Please try again.');
+    }
+  };
+
+  // Auto-start camera for direct AR experience (when coming from site page)
+  const autoStartCamera = async () => {
+    try {
+      console.log('Auto-starting camera for direct AR experience...');
+      setCameraActive(true);
+    } catch (err) {
+      console.error('Error auto-starting camera:', err);
+      setError('Failed to auto-start camera. Please try manually.');
     }
   };
 
@@ -1145,7 +1152,11 @@ export default function ARCameraPage() {
 
                   <div className="flex flex-col w-full gap-3">
                     <Button
-                      onClick={requestCameraPermission}
+                      onClick={
+                        siteId && site
+                          ? autoStartCamera
+                          : requestCameraPermission
+                      }
                       className="w-full rounded-full"
                       disabled={isLoading}>
                       <Camera className="mr-2 h-4 w-4" />
