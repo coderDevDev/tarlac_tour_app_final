@@ -163,15 +163,16 @@ export default function ARCameraPage() {
       console.log('Site data:', site);
       console.log('SiteId:', siteId);
 
-      // Immediately start camera and AR mode for direct AR experience
+      // First priority: Start camera immediately
       console.log('Auto-starting camera for site:', site.name);
       autoStartCamera();
-      // Also enable AR mode directly since we have the site
+
+      // Second priority: Set up AR mode after camera is ready
       setCurrentSite(site);
-      setArMode(true);
-      setModelLoading(true);
-      setModelReady(false);
-      console.log('Auto-enabled AR mode for site:', site.name);
+      console.log('Site set for AR mode:', site.name);
+
+      // Don't enable AR mode yet - wait for camera to be ready
+      console.log('Camera will be activated first, AR mode will follow');
     }
   }, [siteId, site]);
 
@@ -202,6 +203,23 @@ export default function ARCameraPage() {
       stopCamera();
     };
   }, [cameraActive]);
+
+  // Enable AR mode after camera is successfully started
+  useEffect(() => {
+    if (cameraActive && currentSite && !arMode) {
+      console.log(
+        'Camera is active, now enabling AR mode for:',
+        currentSite.name
+      );
+      // Small delay to ensure camera is fully ready
+      setTimeout(() => {
+        setArMode(true);
+        setModelLoading(true);
+        setModelReady(false);
+        console.log('AR mode enabled for site:', currentSite.name);
+      }, 1000); // 1 second delay to ensure camera is stable
+    }
+  }, [cameraActive, currentSite, arMode]);
 
   // Start the camera
   const startCamera = async () => {
@@ -1184,7 +1202,7 @@ export default function ARCameraPage() {
                   </CardTitle>
                   <CardDescription>
                     {siteId && site
-                      ? `Starting AR experience for ${site.name}. Camera is activating...`
+                      ? `Starting camera for ${site.name}. AR experience will load after camera is ready.`
                       : 'Scan QR codes at heritage sites to view 3D models overlaid on the real world.'}
                   </CardDescription>
                 </CardHeader>
@@ -1198,7 +1216,11 @@ export default function ARCameraPage() {
                       <div className="text-center">
                         <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mb-3">
                           <RefreshCw className="h-4 w-4 animate-spin" />
-                          <span>Initializing AR Experience...</span>
+                          <span>
+                            {cameraActive
+                              ? 'Loading 3D Model...'
+                              : 'Starting Camera...'}
+                          </span>
                         </div>
                         <Button
                           onClick={autoStartCamera}
@@ -1242,7 +1264,9 @@ export default function ARCameraPage() {
                       <RefreshCw className="h-4 w-4 animate-spin" />
                       <span>
                         {siteId && site && !cameraActive
-                          ? 'Activating Camera & AR Mode...'
+                          ? 'Starting Camera...'
+                          : siteId && site && cameraActive && !arMode
+                          ? 'Camera Ready - Loading AR Mode...'
                           : 'Processing...'}
                       </span>
                     </div>
@@ -1254,16 +1278,34 @@ export default function ARCameraPage() {
                       <p>Site: {site.name}</p>
                       <p>Camera Active: {cameraActive ? 'Yes' : 'No'}</p>
                       <p>AR Mode: {arMode ? 'Yes' : 'No'}</p>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          console.log('Manual camera start clicked');
-                          setCameraActive(true);
-                        }}
-                        className="mt-2">
-                        Force Start Camera
-                      </Button>
+                      <p>Model Loading: {modelLoading ? 'Yes' : 'No'}</p>
+                      <p>Model Ready: {modelReady ? 'Yes' : 'No'}</p>
+                      <div className="flex gap-2 mt-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            console.log('Manual camera start clicked');
+                            setCameraActive(true);
+                          }}
+                          className="text-xs">
+                          Start Camera
+                        </Button>
+                        {cameraActive && !arMode && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              console.log('Manual AR mode start clicked');
+                              setArMode(true);
+                              setModelLoading(true);
+                              setModelReady(false);
+                            }}
+                            className="text-xs">
+                            Start AR
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   )}
 
