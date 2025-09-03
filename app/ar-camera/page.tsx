@@ -217,7 +217,7 @@ export default function ARCameraPage() {
         setModelLoading(true);
         setModelReady(false);
         console.log('AR mode enabled for site:', currentSite.name);
-      }, 500); // Reduced delay for faster AR mode activation
+      }, 1000); // 1 second delay to ensure camera is stable
     }
   }, [cameraActive, currentSite, arMode]);
 
@@ -919,16 +919,8 @@ export default function ARCameraPage() {
         <canvas ref={canvasRef} className="hidden" />
 
         {/* AR Overlay - 3D Models over Camera */}
-        {currentSite && cameraActive && (
+        {arMode && currentSite && cameraActive && (
           <div className="absolute inset-0 z-20 rounded-2xl overflow-hidden">
-            {/* Debug: Show AR overlay status */}
-            <div className="absolute top-2 left-2 z-40 bg-blue-500/80 text-white px-2 py-1 rounded text-xs">
-              AR Overlay: {arMode ? 'Active' : 'Loading'} | Site:{' '}
-              {currentSite.name}
-            </div>
-            <div className="absolute top-2 right-2 z-40 bg-green-500/80 text-white px-2 py-1 rounded text-xs">
-              Camera: {cameraActive ? 'Active' : 'Inactive'}
-            </div>
             {/* Model Loading Overlay */}
             {modelLoading && !modelReady && (
               <div className="absolute inset-0 bg-black/70 z-30 flex items-center justify-center">
@@ -948,84 +940,70 @@ export default function ARCameraPage() {
               </div>
             )}
 
-            {arMode ? (
-              <Canvas
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  touchAction: 'none',
-                  userSelect: 'none',
-                  background: 'transparent'
+            <Canvas
+              style={{
+                width: '100%',
+                height: '100%',
+                touchAction: 'none',
+                userSelect: 'none'
+              }}
+              camera={{ position: [0, 0, 8], fov: 60 }}
+              gl={{
+                alpha: true,
+                antialias: true,
+                preserveDrawingBuffer: true
+              }}>
+              <PerspectiveCamera makeDefault position={[0, 0, 8]} fov={60} />
+
+              {/* Enhanced Lighting Setup */}
+              <ambientLight intensity={1.5} />
+              <directionalLight position={[10, 10, 5]} intensity={2.5} />
+              <pointLight position={[0, 5, 5]} intensity={1.0} />
+              <hemisphereLight args={[0xffffff, 0x444444, 0.8]} />
+
+              {/* 3D Model Overlay */}
+              <ARModelOverlay
+                url={currentSite.modelUrl || '/models/placeholder.glb'}
+                position={[0, 0, 0]}
+                scale={1.5}
+                onModelLoading={() => setModelLoading(true)}
+                onModelReady={() => {
+                  setModelLoading(false);
+                  setModelReady(true);
                 }}
-                camera={{ position: [0, 0, 8], fov: 60 }}
-                gl={{
-                  alpha: true,
-                  antialias: true,
-                  preserveDrawingBuffer: true,
-                  background: 'transparent'
-                }}>
-                <PerspectiveCamera makeDefault position={[0, 0, 8]} fov={60} />
+              />
 
-                {/* Ensure transparent background */}
-                <color attach="background" args={['transparent']} />
+              {/* Debug Grid to help visualize 3D space */}
+              {/* <gridHelper args={[8, 8, 0x444444, 0x888888]} /> */}
 
-                {/* Enhanced Lighting Setup */}
-                <ambientLight intensity={1.5} />
-                <directionalLight position={[10, 10, 5]} intensity={2.5} />
-                <pointLight position={[0, 5, 5]} intensity={1.0} />
-                <hemisphereLight args={[0xffffff, 0x444444, 0.8]} />
+              {/* Subtle background elements for better AR visualization */}
+              <mesh position={[0, 0, -3]} rotation={[0, 0, 0]}>
+                <planeGeometry args={[16, 16]} />
+                <meshBasicMaterial color={0x000000} transparent opacity={0.1} />
+              </mesh>
 
-                {/* 3D Model Overlay */}
-                <ARModelOverlay
-                  url={currentSite.modelUrl || '/models/placeholder.glb'}
-                  position={[0, 0, 0]}
-                  scale={1.5}
-                  onModelLoading={() => setModelLoading(true)}
-                  onModelReady={() => {
-                    setModelLoading(false);
-                    setModelReady(true);
-                  }}
-                />
+              {/* OrbitControls for touch interaction */}
+              <OrbitControls
+                enableZoom={true}
+                enablePan={true}
+                enableRotate={true}
+                minDistance={3}
+                maxDistance={15}
+                target={[0, 0, 0]}
+                enableDamping={true}
+                dampingFactor={0.05}
+                maxPolarAngle={Math.PI / 1.5}
+                minPolarAngle={Math.PI / 6}
+              />
 
-                {/* Debug Grid to help visualize 3D space - made more subtle */}
-                <gridHelper args={[8, 8, 0x444444, 0x666666]} />
-
-                {/* Removed background mesh to ensure camera feed is visible */}
-
-                {/* OrbitControls for touch interaction */}
-                <OrbitControls
-                  enableZoom={true}
-                  enablePan={true}
-                  enableRotate={true}
-                  minDistance={3}
-                  maxDistance={15}
-                  target={[0, 0, 0]}
-                  enableDamping={true}
-                  dampingFactor={0.05}
-                  maxPolarAngle={Math.PI / 1.5}
-                  minPolarAngle={Math.PI / 6}
-                />
-
-                {/* AR Crosshair for better visual feedback */}
-                <Html center>
-                  <div className="w-16 h-16 border-2 border-white/30 rounded-full relative pointer-events-none">
-                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-white/50 rounded-full"></div>
-                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 border border-white/20 rounded-full"></div>
-                  </div>
-                </Html>
-              </Canvas>
-            ) : (
-              /* AR Mode Loading - Show placeholder while AR mode is initializing */
-              <div className="w-full h-full flex items-center justify-center bg-black/20">
-                <div className="text-center text-white">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-                  <p className="text-sm">Initializing AR Mode...</p>
-                  <p className="text-xs text-gray-300 mt-2">
-                    Preparing 3D model overlay
-                  </p>
+              {/* AR Crosshair for better visual feedback */}
+              <Html center>
+                <div className="w-16 h-16 border-2 border-white/30 rounded-full relative pointer-events-none">
+                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-white/50 rounded-full"></div>
+                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 border border-white/20 rounded-full"></div>
                 </div>
-              </div>
-            )}
+              </Html>
+            </Canvas>
           </div>
         )}
 
