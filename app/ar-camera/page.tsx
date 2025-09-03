@@ -926,6 +926,9 @@ export default function ARCameraPage() {
               AR Overlay: {arMode ? 'Active' : 'Loading'} | Site:{' '}
               {currentSite.name}
             </div>
+            <div className="absolute top-2 right-2 z-40 bg-green-500/80 text-white px-2 py-1 rounded text-xs">
+              Camera: {cameraActive ? 'Active' : 'Inactive'}
+            </div>
             {/* Model Loading Overlay */}
             {modelLoading && !modelReady && (
               <div className="absolute inset-0 bg-black/70 z-30 flex items-center justify-center">
@@ -951,15 +954,20 @@ export default function ARCameraPage() {
                   width: '100%',
                   height: '100%',
                   touchAction: 'none',
-                  userSelect: 'none'
+                  userSelect: 'none',
+                  background: 'transparent'
                 }}
                 camera={{ position: [0, 0, 8], fov: 60 }}
                 gl={{
                   alpha: true,
                   antialias: true,
-                  preserveDrawingBuffer: true
+                  preserveDrawingBuffer: true,
+                  background: 'transparent'
                 }}>
                 <PerspectiveCamera makeDefault position={[0, 0, 8]} fov={60} />
+
+                {/* Ensure transparent background */}
+                <color attach="background" args={['transparent']} />
 
                 {/* Enhanced Lighting Setup */}
                 <ambientLight intensity={1.5} />
@@ -979,18 +987,10 @@ export default function ARCameraPage() {
                   }}
                 />
 
-                {/* Debug Grid to help visualize 3D space */}
-                <gridHelper args={[8, 8, 0x444444, 0x888888]} />
+                {/* Debug Grid to help visualize 3D space - made more subtle */}
+                <gridHelper args={[8, 8, 0x444444, 0x666666]} />
 
-                {/* Subtle background elements for better AR visualization */}
-                <mesh position={[0, 0, -3]} rotation={[0, 0, 0]}>
-                  <planeGeometry args={[16, 16]} />
-                  <meshBasicMaterial
-                    color={0x000000}
-                    transparent
-                    opacity={0.1}
-                  />
-                </mesh>
+                {/* Removed background mesh to ensure camera feed is visible */}
 
                 {/* OrbitControls for touch interaction */}
                 <OrbitControls
