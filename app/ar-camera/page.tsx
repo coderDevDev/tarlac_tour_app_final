@@ -918,6 +918,25 @@ export default function ARCameraPage() {
         {/* Hidden canvas for QR scanning */}
         <canvas ref={canvasRef} className="hidden" />
 
+        {/* Manual Camera Start Button - Show when camera is not active */}
+        {!cameraActive && currentSite && (
+          <div className="absolute inset-0 z-20 rounded-2xl overflow-hidden bg-black/50 flex items-center justify-center">
+            <div className="text-center text-white p-6">
+              <Camera className="h-16 w-16 mx-auto mb-4 text-white/70" />
+              <h3 className="text-lg font-semibold mb-2">Camera Not Active</h3>
+              <p className="text-sm text-gray-300 mb-4">
+                Click below to start the camera for AR experience
+              </p>
+              <Button
+                onClick={autoStartCamera}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-full">
+                <Camera className="mr-2 h-4 w-4" />
+                Start Camera for AR
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* AR Overlay - 3D Models over Camera */}
         {arMode && currentSite && cameraActive && (
           <div className="absolute inset-0 z-20 rounded-2xl overflow-hidden">
@@ -1162,6 +1181,60 @@ export default function ARCameraPage() {
               className="bg-black/50 hover:bg-black/70 text-white border-white/30 rounded-full">
               <X className="h-4 w-4" />
             </Button>
+          </div>
+        )}
+
+        {/* Bottom Camera Control - Always visible when site is loaded */}
+        {currentSite && (
+          <div className="absolute bottom-4 left-4 right-4 z-30">
+            <div className="bg-black/80 backdrop-blur-md rounded-xl p-4 text-center border border-white/20">
+              <div className="flex items-center justify-center gap-3 mb-3">
+                <div
+                  className={`p-2 rounded-full border ${
+                    cameraActive
+                      ? 'bg-green-500/20 border-green-400/30'
+                      : 'bg-red-500/20 border-red-400/30'
+                  }`}>
+                  {cameraActive ? (
+                    <Camera className="h-5 w-5 text-green-400" />
+                  ) : (
+                    <Camera className="h-5 w-5 text-red-400" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm text-white">
+                    {currentSite.name}
+                  </h3>
+                  <p className="text-xs text-gray-300">
+                    {cameraActive
+                      ? 'Camera Active - AR Ready'
+                      : 'Camera Inactive - Click to Start'}
+                  </p>
+                </div>
+              </div>
+
+              {!cameraActive && (
+                <Button
+                  onClick={autoStartCamera}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-full">
+                  <Camera className="mr-2 h-4 w-4" />
+                  Start Camera for AR Experience
+                </Button>
+              )}
+
+              {cameraActive && !arMode && (
+                <Button
+                  onClick={() => {
+                    setArMode(true);
+                    setModelLoading(true);
+                    setModelReady(false);
+                  }}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white rounded-full">
+                  <Globe className="mr-2 h-4 w-4" />
+                  Enable AR Mode
+                </Button>
+              )}
+            </div>
           </div>
         )}
 
