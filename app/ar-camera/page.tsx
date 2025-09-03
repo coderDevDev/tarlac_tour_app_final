@@ -132,7 +132,7 @@ export default function ARCameraPage() {
   const site = siteId ? getSiteById(siteId) : null;
   const validSiteIds = getAllSiteIds();
 
-  // Check camera permissions
+  // Check camera permissions and auto-start camera if siteId is provided
   useEffect(() => {
     const checkPermissions = async () => {
       try {
@@ -154,7 +154,24 @@ export default function ARCameraPage() {
     };
 
     checkPermissions();
-  }, []);
+
+    // Auto-start camera and AR mode if siteId is provided (coming from site page)
+    if (siteId && site) {
+      console.log(
+        'SiteId provided, auto-starting camera and AR mode for direct AR experience'
+      );
+      // Small delay to ensure component is fully mounted
+      setTimeout(() => {
+        setCameraActive(true);
+        // Also enable AR mode directly since we have the site
+        setCurrentSite(site);
+        setArMode(true);
+        setModelLoading(true);
+        setModelReady(false);
+        console.log('Auto-enabled AR mode for site:', site.name);
+      }, 500);
+    }
+  }, [siteId, site]);
 
   useEffect(() => {
     console.log('Camera permission status:', cameraPermission);
@@ -1111,11 +1128,14 @@ export default function ARCameraPage() {
               <Card className="max-w-md mx-auto border-none shadow-lg overflow-hidden">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-2xl">
-                    Augmented Reality Scanner
+                    {siteId && site
+                      ? `AR Experience: ${site.name}`
+                      : 'Augmented Reality Scanner'}
                   </CardTitle>
                   <CardDescription>
-                    Scan QR codes at heritage sites to view 3D models overlaid
-                    on the real world.
+                    {siteId && site
+                      ? `Loading AR experience for ${site.name}. Camera will start automatically.`
+                      : 'Scan QR codes at heritage sites to view 3D models overlaid on the real world.'}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col items-center space-y-6">
@@ -1129,7 +1149,9 @@ export default function ARCameraPage() {
                       className="w-full rounded-full"
                       disabled={isLoading}>
                       <Camera className="mr-2 h-4 w-4" />
-                      Scan QR Code with Camera
+                      {siteId && site
+                        ? 'Start AR Experience'
+                        : 'Scan QR Code with Camera'}
                     </Button>
 
                     {/* <Button
@@ -1150,10 +1172,14 @@ export default function ARCameraPage() {
                     />
                   </div>
 
-                  {isLoading && (
+                  {(isLoading || (siteId && site && !cameraActive)) && (
                     <div className="flex items-center justify-center gap-2 text-sm">
                       <RefreshCw className="h-4 w-4 animate-spin" />
-                      <span>Processing...</span>
+                      <span>
+                        {siteId && site && !cameraActive
+                          ? 'Starting AR Experience...'
+                          : 'Processing...'}
+                      </span>
                     </div>
                   )}
 

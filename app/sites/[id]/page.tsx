@@ -1,6 +1,6 @@
 'use client';
 
-import { getSiteById } from '@/lib/data';
+import { getSiteById, type HeritageSite } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
@@ -26,16 +26,14 @@ import QRCodeDisplay from '@/components/qr-code-display';
 
 export default function SitePage() {
   const { id } = useParams();
-  const [site, setSite] = useState(null);
+  const [site, setSite] = useState<HeritageSite | null>(null);
   const [loading, setLoading] = useState(true);
   const [showQRCode, setShowQRCode] = useState(false);
 
   useEffect(() => {
     if (id) {
       const siteData = getSiteById(id.toString());
-      if (siteData) {
-        setSite(siteData);
-      }
+      setSite(siteData);
       setLoading(false);
     }
   }, [id]);
@@ -123,7 +121,7 @@ export default function SitePage() {
 
           <div className="flex flex-wrap gap-4 mb-8">
             <Button asChild className="rounded-full">
-              <Link href={`/ar-world?siteId=${site.id}`}>
+              <Link href={`/ar-camera?siteId=${site.id}`}>
                 <Camera className="mr-2 h-4 w-4" />
                 View in AR
               </Link>
@@ -165,7 +163,7 @@ export default function SitePage() {
                         Scan to view in AR
                       </h3>
                       <QRCodeDisplay
-                        url={`${window.location.origin}/ar-world?siteId=${site.id}`}
+                        url={`${window.location.origin}/ar-camera?siteId=${site.id}`}
                         siteName={site.name}
                       />
                       <p className="text-sm text-muted-foreground mt-4 text-center">
