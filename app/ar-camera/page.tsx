@@ -214,9 +214,19 @@ export default function ARCameraPage() {
       // Auto-enable AR mode after a short delay to ensure camera is ready
       setTimeout(() => {
         console.log('Auto-enabling AR mode for site:', site.name);
+        console.log('Model URL:', site.modelUrl || '/models/placeholder.glb');
         setArMode(true);
         setModelLoading(true);
         setModelReady(false);
+
+        // Fallback: If model doesn't load within 10 seconds, mark as ready
+        setTimeout(() => {
+          if (!modelReady) {
+            console.log('Model loading timeout - marking as ready');
+            setModelLoading(false);
+            setModelReady(true);
+          }
+        }, 10000);
       }, 2000); // 2 second delay to ensure camera is fully ready
 
       console.log('Camera and AR mode will be activated automatically');
@@ -950,10 +960,15 @@ export default function ARCameraPage() {
                       'AR Camera: Model loading started for:',
                       currentSite?.modelUrl || '/models/placeholder.glb'
                     );
+                    console.log('Setting modelLoading to true');
                     setModelLoading(true);
+                    setModelReady(false);
                   }}
                   onModelReady={() => {
                     console.log('AR Camera: Model ready callback received');
+                    console.log(
+                      'Setting modelLoading to false, modelReady to true'
+                    );
                     setModelLoading(false);
                     setModelReady(true);
                   }}
@@ -1022,7 +1037,7 @@ export default function ARCameraPage() {
                     <p className="text-xs text-gray-300">
                       {modelReady
                         ? 'AR Mode Active - Touch to interact with 3D model'
-                        : 'Loading 3D model...'}
+                        : `Loading 3D model... (Loading: ${modelLoading}, Ready: ${modelReady})`}
                     </p>
                   </div>
                 </div>
