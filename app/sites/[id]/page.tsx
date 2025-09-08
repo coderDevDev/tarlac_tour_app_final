@@ -23,12 +23,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import AudioDescriptionPlayer from '@/components/audio-description-player';
 import QRCodeDisplay from '@/components/qr-code-display';
+import ARModal from '@/components/ar-modal';
 
 export default function SitePage() {
   const { id } = useParams();
   const [site, setSite] = useState<HeritageSite | null>(null);
   const [loading, setLoading] = useState(true);
   const [showQRCode, setShowQRCode] = useState(false);
+  const [showARModal, setShowARModal] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -66,6 +68,14 @@ export default function SitePage() {
 
   const toggleQRCode = () => {
     setShowQRCode(!showQRCode);
+  };
+
+  const openARModal = () => {
+    setShowARModal(true);
+  };
+
+  const closeARModal = () => {
+    setShowARModal(false);
   };
 
   return (
@@ -120,11 +130,9 @@ export default function SitePage() {
           )}
 
           <div className="flex flex-wrap gap-4 mb-8">
-            <Button asChild className="rounded-full">
-              <Link href={`/ar-camera?siteId=${site.id}`}>
-                <Camera className="mr-2 h-4 w-4" />
-                View in AR
-              </Link>
+            <Button onClick={openARModal} className="rounded-full">
+              <Camera className="mr-2 h-4 w-4" />
+              View in AR
             </Button>
             <Button asChild variant="outline" className="rounded-full">
               <Link href={`/map?siteId=${site.id}`}>
@@ -244,6 +252,19 @@ export default function SitePage() {
           </TabsContent>
         </AnimatePresence>
       </Tabs>
+
+      {/* AR Modal */}
+      {site && (
+        <ARModal
+          isOpen={showARModal}
+          onClose={closeARModal}
+          site={{
+            id: site.id,
+            name: site.name,
+            modelUrl: site.modelUrl
+          }}
+        />
+      )}
     </div>
   );
 }
