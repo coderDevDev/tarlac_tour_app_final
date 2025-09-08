@@ -933,7 +933,7 @@ export default function ARCameraPage() {
                       Loading 3D Model
                     </h3>
                     <p className="text-sm text-gray-300 max-w-xs">
-                      Preparing {site.name} for AR experience...
+                      Preparing {currentSite?.name} for AR experience...
                     </p>
                     <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-400">
                       <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
@@ -966,13 +966,13 @@ export default function ARCameraPage() {
 
                 {/* 3D Model Overlay */}
                 <ARModelOverlay
-                  url={site.modelUrl || '/models/placeholder.glb'}
+                  url={currentSite?.modelUrl || '/models/placeholder.glb'}
                   position={[0, 0, 0]}
                   scale={1.5}
                   onModelLoading={() => {
                     console.log(
                       'AR Camera: Model loading started for:',
-                      site.modelUrl || '/models/placeholder.glb'
+                      currentSite?.modelUrl || '/models/placeholder.glb'
                     );
                     setModelLoading(true);
                   }}
@@ -1041,7 +1041,7 @@ export default function ARCameraPage() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-sm text-white">
-                      {site.name}
+                      {currentSite?.name}
                     </h3>
                     <p className="text-xs text-gray-300">
                       {modelReady
@@ -1092,7 +1092,7 @@ export default function ARCameraPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm text-white">
-                    {site.name}
+                    {currentSite?.name}
                   </h3>
                   <p className="text-xs text-gray-300">
                     {cameraActive
@@ -1114,9 +1114,18 @@ export default function ARCameraPage() {
               {cameraActive && !arMode && (
                 <Button
                   onClick={() => {
+                    console.log('Enable AR Mode clicked in siteId section');
+                    console.log('Current state before:', {
+                      arMode,
+                      currentSite: currentSite?.name,
+                      cameraActive,
+                      modelLoading,
+                      modelReady
+                    });
                     setArMode(true);
                     setModelLoading(true);
                     setModelReady(false);
+                    console.log('AR Mode enabled, model loading started');
                   }}
                   className="w-full bg-green-600 hover:bg-green-700 text-white rounded-full">
                   <Globe className="mr-2 h-4 w-4" />
