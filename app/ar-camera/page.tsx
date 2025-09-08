@@ -816,38 +816,9 @@ export default function ARCameraPage() {
     try {
       console.log('Auto-starting camera for direct AR experience...');
 
-      // First try to get camera permission directly
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        try {
-          console.log('Requesting camera permission directly...');
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: 'environment',
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
-            },
-            audio: false
-          });
-
-          console.log('Camera permission granted, setting up video...');
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-            streamRef.current = stream;
-            setCameraPermission('granted');
-            setCameraActive(true);
-            console.log('Camera auto-started successfully');
-          }
-        } catch (permissionError) {
-          console.log(
-            'Direct permission request failed, falling back to normal flow:',
-            permissionError
-          );
-          setCameraActive(true);
-        }
-      } else {
-        console.log('MediaDevices not available, using normal flow');
-        setCameraActive(true);
-      }
+      // Simply set camera active and let the useEffect handle the actual camera start
+      setCameraActive(true);
+      console.log('Camera activation requested, will start via useEffect');
     } catch (err) {
       console.error('Error auto-starting camera:', err);
       setError('Failed to auto-start camera. Please try manually.');
