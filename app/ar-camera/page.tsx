@@ -195,24 +195,26 @@ export default function ARCameraPage() {
 
     checkPermissions();
 
-    // Auto-start camera and AR mode if siteId is provided (coming from site page)
+    // Auto-start camera if siteId is provided (coming from site page)
     if (siteId && site) {
       console.log(
-        'SiteId provided, auto-starting camera and AR mode for direct AR experience'
+        'SiteId provided, auto-starting camera for direct AR experience'
       );
       console.log('Site data:', site);
       console.log('SiteId:', siteId);
 
-      // First priority: Start camera immediately
-      console.log('Auto-starting camera for site:', site.name);
-      autoStartCamera();
-
-      // Second priority: Set up AR mode after camera is ready
+      // Set up the site for AR mode
       setCurrentSite(site);
       console.log('Site set for AR mode:', site.name);
 
-      // Don't enable AR mode yet - wait for camera to be ready
-      console.log('Camera will be activated first, AR mode will follow');
+      // Auto-start camera
+      console.log('Auto-starting camera for site:', site.name);
+      autoStartCamera();
+
+      // AR mode will be enabled manually by user clicking "Enable AR Mode" button
+      console.log(
+        'Camera will be activated, user can then enable AR mode manually'
+      );
     }
   }, [siteId, site]);
 
@@ -244,22 +246,9 @@ export default function ARCameraPage() {
     };
   }, [cameraActive]);
 
-  // Enable AR mode after camera is successfully started
-  useEffect(() => {
-    if (cameraActive && currentSite && !arMode) {
-      console.log(
-        'Camera is active, now enabling AR mode for:',
-        currentSite.name
-      );
-      // Small delay to ensure camera is fully ready
-      setTimeout(() => {
-        setArMode(true);
-        setModelLoading(true);
-        setModelReady(false);
-        console.log('AR mode enabled for site:', currentSite.name);
-      }, 1000); // 1 second delay to ensure camera is stable
-    }
-  }, [cameraActive, currentSite, arMode]);
+  // Enable AR mode after camera is successfully started - REMOVED AUTO-ENABLE
+  // Now users need to manually click "Enable AR Mode" button
+  // This prevents the loading state conflict
 
   // Start the camera
   const startCamera = async () => {
