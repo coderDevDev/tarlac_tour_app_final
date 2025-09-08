@@ -195,10 +195,10 @@ export default function ARCameraPage() {
 
     checkPermissions();
 
-    // Auto-start camera if siteId is provided (coming from site page)
+    // Auto-start camera and AR mode if siteId is provided (coming from site page)
     if (siteId && site) {
       console.log(
-        'SiteId provided, auto-starting camera for direct AR experience'
+        'SiteId provided, auto-starting camera and AR mode for direct AR experience'
       );
       console.log('Site data:', site);
       console.log('SiteId:', siteId);
@@ -211,10 +211,15 @@ export default function ARCameraPage() {
       console.log('Auto-starting camera for site:', site.name);
       autoStartCamera();
 
-      // AR mode will be enabled manually by user clicking "Enable AR Mode" button
-      console.log(
-        'Camera will be activated, user can then enable AR mode manually'
-      );
+      // Auto-enable AR mode after a short delay to ensure camera is ready
+      setTimeout(() => {
+        console.log('Auto-enabling AR mode for site:', site.name);
+        setArMode(true);
+        setModelLoading(true);
+        setModelReady(false);
+      }, 2000); // 2 second delay to ensure camera is fully ready
+
+      console.log('Camera and AR mode will be activated automatically');
     }
   }, [siteId, site]);
 
