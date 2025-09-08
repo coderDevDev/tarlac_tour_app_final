@@ -922,7 +922,7 @@ export default function ARCameraPage() {
           )}
 
           {/* AR Overlay - 3D Models over Camera */}
-          {arMode && cameraActive && (
+          {arMode && currentSite && cameraActive && (
             <div className="absolute inset-0 z-20 rounded-2xl overflow-hidden">
               {/* Model Loading Overlay */}
               {modelLoading && !modelReady && (
