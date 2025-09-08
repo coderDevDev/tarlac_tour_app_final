@@ -58,32 +58,67 @@ function ARModelOverlay({
   const { actions, mixer } = useAnimations(animations, scene);
   const meshRef = useRef<THREE.Mesh>(null);
   const groupRef = useRef<THREE.Group>(null);
+  const [modelLoaded, setModelLoaded] = useState(false);
 
   useEffect(() => {
     // Notify parent that model is loading
     onModelLoading?.();
+    setModelLoaded(false);
+    console.log('AR Model Overlay: Starting to load model:', url);
+  }, [url, onModelLoading]);
 
+  useEffect(() => {
+    // Check if model is actually loaded
+    if (scene && scene.children && scene.children.length > 0) {
+      console.log(
+        'AR Model Overlay: Model scene loaded, children count:',
+        scene.children.length
+      );
+
+      // Small delay to ensure everything is ready
+      const timer = setTimeout(() => {
+        setModelLoaded(true);
+        onModelReady?.();
+        console.log('AR Model Overlay: Model ready callback triggered');
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [scene, onModelReady]);
+
+  // Fallback: If model doesn't load within 10 seconds, mark as ready anyway
+  useEffect(() => {
+    const fallbackTimer = setTimeout(() => {
+      if (!modelLoaded) {
+        console.log(
+          'AR Model Overlay: Fallback timer triggered - marking model as ready'
+        );
+        setModelLoaded(true);
+        onModelReady?.();
+      }
+    }, 10000);
+
+    return () => clearTimeout(fallbackTimer);
+  }, [modelLoaded, onModelReady]);
+
+  useEffect(() => {
     // Play the first animation if available
-    if (animations.length > 0 && actions) {
+    if (animations.length > 0 && actions && modelLoaded) {
       const firstAction = Object.values(actions)[0];
       if (firstAction) {
         firstAction.play();
+        console.log('AR Model Overlay: Animation started');
       }
     }
+  }, [actions, animations, modelLoaded]);
 
-    // Pass ref back to parent when ready
-    if (groupRef.current) {
-      console.log('AR Model Overlay ready:', url);
-      // Notify parent that model is ready
-      onModelReady?.();
-    }
-
+  useEffect(() => {
     return () => {
       if (mixer) {
         mixer.stopAllAction();
       }
     };
-  }, [actions, animations, mixer, url, onModelReady, onModelLoading]);
+  }, [mixer]);
 
   return (
     <group ref={groupRef} position={position} scale={scale}>
@@ -98,10 +133,15 @@ function ARModelOverlay({
         }}
       />
 
-      {/* Simple indicator that model is ready */}
+      {/* Model status indicator */}
       <Html position={[0, 1, 0]}>
-        <div className="bg-green-500/80 text-white px-2 py-1 rounded text-xs font-medium backdrop-blur-sm">
-          ✓ Model Ready
+        <div
+          className={`px-2 py-1 rounded text-xs font-medium backdrop-blur-sm ${
+            modelLoaded
+              ? 'bg-green-500/80 text-white'
+              : 'bg-blue-500/80 text-white'
+          }`}>
+          {modelLoaded ? '✓ Model Ready' : '⏳ Loading...'}
         </div>
       </Html>
     </group>
@@ -940,8 +980,15 @@ export default function ARCameraPage() {
                   url={site.modelUrl || '/models/placeholder.glb'}
                   position={[0, 0, 0]}
                   scale={1.5}
-                  onModelLoading={() => setModelLoading(true)}
+                  onModelLoading={() => {
+                    console.log(
+                      'AR Camera: Model loading started for:',
+                      site.modelUrl || '/models/placeholder.glb'
+                    );
+                    setModelLoading(true);
+                  }}
                   onModelReady={() => {
+                    console.log('AR Camera: Model ready callback received');
                     setModelLoading(false);
                     setModelReady(true);
                   }}
