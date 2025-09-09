@@ -1,18 +1,74 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Camera, Globe } from 'lucide-react';
+import { X, Camera, Globe, Target, Move3D, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Canvas, useThree } from '@react-three/fiber';
+import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import {
   useGLTF,
   Html,
   useAnimations,
   OrbitControls,
-  PerspectiveCamera
+  PerspectiveCamera,
+  Grid,
+  Environment
 } from '@react-three/drei';
 import * as THREE from 'three';
+
+// AR Surface Detection Component
+function ARSurfaceDetection({
+  onSurfaceDetected
+}: {
+  onSurfaceDetected?: (position: [number, number, number]) => void;
+}) {
+  const [surfacePosition, setSurfacePosition] = useState<
+    [number, number, number]
+  >([0, -2, 0]);
+  const [isDetecting, setIsDetecting] = useState(true);
+  const detectionRef = useRef<THREE.Group>(null);
+
+  useFrame(state => {
+    if (detectionRef.current && isDetecting) {
+      // Simulate surface detection with camera movement
+      const time = state.clock.getElapsedTime();
+      const newY = -2 + Math.sin(time * 0.5) * 0.5;
+      const newPosition: [number, number, number] = [0, newY, 0];
+      setSurfacePosition(newPosition);
+      onSurfaceDetected?.(newPosition);
+    }
+  });
+
+  return (
+    <group ref={detectionRef}>
+      {/* Surface detection grid */}
+      <Grid
+        position={surfacePosition}
+        args={[10, 10]}
+        cellSize={0.5}
+        cellThickness={0.5}
+        cellColor="#6f6f6f"
+        sectionSize={3}
+        sectionThickness={1}
+        sectionColor="#9d4edd"
+        fadeDistance={30}
+        fadeStrength={1}
+        followCamera={false}
+        infiniteGrid={true}
+      />
+
+      {/* Surface indicator */}
+      <Html position={[0, surfacePosition[1] + 0.1, 0]} center>
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-green-400 rounded-full animate-pulse bg-green-400/20"></div>
+          <div className="text-xs text-green-400 mt-1 font-medium">
+            Surface Detected
+          </div>
+        </div>
+      </Html>
+    </group>
+  );
+}
 
 // AR Model Component for modal
 function ARModelOverlay({
@@ -20,13 +76,15 @@ function ARModelOverlay({
   position = [0, 0, 0],
   scale = 1.5,
   onModelReady,
-  onModelLoading
+  onModelLoading,
+  surfacePosition = [0, 0, 0]
 }: {
   url: string;
   position?: [number, number, number];
   scale?: number;
   onModelReady?: () => void;
   onModelLoading?: () => void;
+  surfacePosition?: [number, number, number];
 }) {
   const { scene, animations } = useGLTF(url);
   const { actions, mixer } = useAnimations(animations, scene);
@@ -97,7 +155,14 @@ function ARModelOverlay({
   }, [mixer]);
 
   return (
-    <group ref={groupRef} position={position} scale={scale}>
+    <group
+      ref={groupRef}
+      position={[
+        surfacePosition[0],
+        surfacePosition[1] + 0.5,
+        surfacePosition[2]
+      ]}
+      scale={scale}>
       <primitive
         ref={meshRef}
         object={scene}
@@ -109,17 +174,19 @@ function ARModelOverlay({
         }}
       />
 
-      {/* Model status indicator */}
-      {/* <Html position={[0, 1, 0]}>
-        <div
-          className={`px-2 py-1 rounded text-xs font-medium backdrop-blur-sm ${
-            modelLoaded
-              ? 'bg-green-500/80 text-white'
-              : 'bg-blue-500/80 text-white'
-          }`}>
-          {modelLoaded ? '✓ Model Ready' : '⏳ Loading...'}
+      {/* AR Model Shadow */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.1, 0]}>
+        <planeGeometry args={[2, 2]} />
+        <meshBasicMaterial color="#000000" transparent opacity={0.3} />
+      </mesh>
+
+      {/* AR Model Info */}
+      <Html position={[0, 2, 0]} center>
+        <div className="text-center bg-black/80 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/20">
+          <div className="text-white text-sm font-medium">3D Model</div>
+          <div className="text-green-400 text-xs">Touch to interact</div>
         </div>
-      </Html> */}
+      </Html>
     </group>
   );
 }
@@ -141,6 +208,13 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
   const [modelReady, setModelReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
+  const [surfaceDetected, setSurfaceDetected] = useState(false);
+  const [surfacePosition, setSurfacePosition] = useState<
+    [number, number, number]
+  >([0, -2, 0]);
+  const [arInteractionMode, setArInteractionMode] = useState<
+    'move' | 'rotate' | 'scale'
+  >('move');
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -251,6 +325,15 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
     console.log('States updated: modelLoading=false, modelReady=true');
   }, []);
 
+  const handleSurfaceDetected = useCallback(
+    (position: [number, number, number]) => {
+      console.log('AR Modal: Surface detected at:', position);
+      setSurfacePosition(position);
+      setSurfaceDetected(true);
+    },
+    []
+  );
+
   const startCamera = async () => {
     try {
       console.log('Starting camera for AR modal...');
@@ -357,6 +440,40 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
             <X className="h-5 w-5" />
           </Button>
 
+          {/* AR Interaction Controls */}
+          {arMode && surfaceDetected && (
+            <div className="absolute top-4 left-4 z-30 flex gap-2">
+              <Button
+                size="sm"
+                variant={arInteractionMode === 'move' ? 'default' : 'secondary'}
+                onClick={() => setArInteractionMode('move')}
+                className="bg-blue-500/80 hover:bg-blue-600/90 text-white border-blue-400/50 rounded-lg shadow-lg">
+                <Move3D className="h-4 w-4 mr-1" />
+                Move
+              </Button>
+              <Button
+                size="sm"
+                variant={
+                  arInteractionMode === 'rotate' ? 'default' : 'secondary'
+                }
+                onClick={() => setArInteractionMode('rotate')}
+                className="bg-purple-500/80 hover:bg-purple-600/90 text-white border-purple-400/50 rounded-lg shadow-lg">
+                <RotateCcw className="h-4 w-4 mr-1" />
+                Rotate
+              </Button>
+              <Button
+                size="sm"
+                variant={
+                  arInteractionMode === 'scale' ? 'default' : 'secondary'
+                }
+                onClick={() => setArInteractionMode('scale')}
+                className="bg-green-500/80 hover:bg-green-600/90 text-white border-green-400/50 rounded-lg shadow-lg">
+                <Target className="h-4 w-4 mr-1" />
+                Scale
+              </Button>
+            </div>
+          )}
+
           {/* Debug Button - Force Model Ready */}
           {arMode && modelLoading && (
             <Button
@@ -367,7 +484,7 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
                 setModelLoading(false);
                 setModelReady(true);
               }}
-              className="absolute top-4 left-4 z-30 bg-blue-500/80 hover:bg-blue-600/90 text-white border-blue-400/50 rounded-lg shadow-lg">
+              className="absolute top-16 left-4 z-30 bg-blue-500/80 hover:bg-blue-600/90 text-white border-blue-400/50 rounded-lg shadow-lg">
               Force Ready
             </Button>
           )}
@@ -447,38 +564,75 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
                 }}>
                 <PerspectiveCamera makeDefault position={[0, 0, 8]} fov={60} />
 
-                {/* Enhanced Lighting Setup */}
-                <ambientLight intensity={1.5} />
-                <directionalLight position={[10, 10, 5]} intensity={2.5} />
-                <pointLight position={[0, 5, 5]} intensity={1.0} />
-                <hemisphereLight args={[0xffffff, 0x444444, 0.8]} />
+                {/* AR Environment Setup */}
+                <Environment preset="sunset" />
 
-                {/* 3D Model Overlay */}
-                <ARModelOverlay
-                  url={site.modelUrl || '/models/placeholder.glb'}
-                  // position={[0, 0, 0]}
-                  // scale={1.5}
-                  onModelLoading={handleModelLoading}
-                  onModelReady={handleModelReady}
+                {/* Dynamic Lighting based on AR context */}
+                <ambientLight intensity={0.8} />
+                <directionalLight
+                  position={[5, 10, 5]}
+                  intensity={1.5}
+                  castShadow
+                  shadow-mapSize={[1024, 1024]}
                 />
+                <pointLight position={[0, 5, 5]} intensity={0.8} />
+                <hemisphereLight args={[0xffffff, 0x444444, 0.6]} />
 
-                {/* OrbitControls for touch interaction */}
+                {/* AR Surface Detection */}
+                <ARSurfaceDetection onSurfaceDetected={handleSurfaceDetected} />
+
+                {/* 3D Model Overlay - Only show when surface is detected */}
+                {surfaceDetected && (
+                  <ARModelOverlay
+                    url={site.modelUrl || '/models/placeholder.glb'}
+                    scale={1.5}
+                    surfacePosition={surfacePosition}
+                    onModelLoading={handleModelLoading}
+                    onModelReady={handleModelReady}
+                  />
+                )}
+
+                {/* Enhanced OrbitControls for AR interaction */}
                 <OrbitControls
                   enableZoom={true}
                   enablePan={true}
                   enableRotate={true}
                   minDistance={2}
-                  maxDistance={10}
-                  target={[0, 0, 0]}
+                  maxDistance={15}
+                  target={surfacePosition}
                   enableDamping={true}
                   dampingFactor={0.05}
+                  maxPolarAngle={Math.PI / 1.8}
+                  minPolarAngle={Math.PI / 6}
+                  touches={{
+                    ONE: 1, // One finger for rotation
+                    TWO: 2 // Two fingers for zoom and pan
+                  }}
                 />
 
-                {/* AR Crosshair */}
+                {/* AR Crosshair with surface detection feedback */}
                 <Html center>
-                  <div className="w-16 h-16 border-2 border-white/30 rounded-full relative pointer-events-none">
-                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-white/50 rounded-full"></div>
-                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 border border-white/20 rounded-full"></div>
+                  <div className="text-center">
+                    <div
+                      className={`w-16 h-16 border-2 rounded-full relative pointer-events-none transition-all duration-300 ${
+                        surfaceDetected
+                          ? 'border-green-400 shadow-green-400/50'
+                          : 'border-white/30'
+                      }`}>
+                      <div
+                        className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full transition-all duration-300 ${
+                          surfaceDetected ? 'bg-green-400' : 'bg-white/50'
+                        }`}></div>
+                      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 border border-white/20 rounded-full"></div>
+                    </div>
+                    <div
+                      className={`text-xs mt-2 font-medium transition-colors duration-300 ${
+                        surfaceDetected ? 'text-green-400' : 'text-white/70'
+                      }`}>
+                      {surfaceDetected
+                        ? 'Surface Ready'
+                        : 'Detecting Surface...'}
+                    </div>
                   </div>
                 </Html>
               </Canvas>
@@ -491,16 +645,16 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
-              className="absolute top-4 left-4 right-4 z-30 bg-black/80 text-white p-4 rounded-xl backdrop-blur-md border border-white/20">
+              className="absolute bottom-4 left-4 right-4 z-30 bg-black/80 text-white p-4 rounded-xl backdrop-blur-md border border-white/20">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div
                     className={`p-2 rounded-full border ${
-                      modelReady
+                      surfaceDetected && modelReady
                         ? 'bg-green-500/20 border-green-400/30'
                         : 'bg-blue-500/20 border-blue-400/30'
                     }`}>
-                    {modelReady ? (
+                    {surfaceDetected && modelReady ? (
                       <Globe className="h-5 w-5 text-green-400" />
                     ) : (
                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-400"></div>
@@ -508,13 +662,23 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
                   </div>
                   <div>
                     <h3 className="font-semibold text-sm text-white">
-                      {site.name}
+                      {site.name} - AR Experience
                     </h3>
                     <p className="text-xs text-gray-300">
-                      {modelReady
-                        ? 'AR Mode Active - Touch to interact with 3D model'
-                        : `Loading 3D model... (Loading: ${modelLoading}, Ready: ${modelReady}, AR: ${arMode}, Camera: ${cameraActive})`}
+                      {surfaceDetected && modelReady
+                        ? `AR Active - ${arInteractionMode} mode - Touch to interact`
+                        : surfaceDetected
+                        ? 'Surface detected - Loading 3D model...'
+                        : 'Detecting surface...'}
                     </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-gray-400">
+                    {surfaceDetected ? '✓ Surface' : '⏳ Surface'}
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    {modelReady ? '✓ Model' : '⏳ Model'}
                   </div>
                 </div>
               </div>

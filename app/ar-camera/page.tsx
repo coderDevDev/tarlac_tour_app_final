@@ -1054,7 +1054,7 @@ export default function ARCameraPage() {
                   <p className="text-xs text-gray-300">
                     {modelReady
                       ? 'AR Mode Active - Touch to interact with 3D model'
-                      : 'Loading 3D model...'}
+                      : 'Loading ...'}
                   </p>
                 </div>
               </div>
@@ -1120,7 +1120,7 @@ export default function ARCameraPage() {
               <div className="flex items-center justify-center gap-3 mb-2">
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                 <span className="text-sm font-medium text-white">
-                  Loading 3D Model
+                  Loading
                 </span>
               </div>
               <p className="text-xs text-blue-100">
