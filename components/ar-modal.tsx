@@ -110,7 +110,7 @@ function ARModelOverlay({
       />
 
       {/* Model status indicator */}
-      <Html position={[0, 1, 0]}>
+      {/* <Html position={[0, 1, 0]}>
         <div
           className={`px-2 py-1 rounded text-xs font-medium backdrop-blur-sm ${
             modelLoaded
@@ -119,7 +119,7 @@ function ARModelOverlay({
           }`}>
           {modelLoaded ? '✓ Model Ready' : '⏳ Loading...'}
         </div>
-      </Html>
+      </Html> */}
     </group>
   );
 }
@@ -435,7 +435,7 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
                   position: 'relative',
                   zIndex: 1
                 }}
-                camera={{ position: [0, 0, 8], fov: 60 }}
+                camera={{ position: [0, 0, 5], fov: 75 }}
                 gl={{
                   alpha: true,
                   antialias: true,
@@ -456,8 +456,8 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
                 {/* 3D Model Overlay */}
                 <ARModelOverlay
                   url={site.modelUrl || '/models/placeholder.glb'}
-                  position={[0, 0, 0]}
-                  scale={1.5}
+                  // position={[0, 0, 0]}
+                  // scale={1.5}
                   onModelLoading={handleModelLoading}
                   onModelReady={handleModelReady}
                 />
@@ -467,20 +467,11 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
                   enableZoom={true}
                   enablePan={true}
                   enableRotate={true}
-                  minDistance={1}
-                  maxDistance={20}
+                  minDistance={2}
+                  maxDistance={10}
                   target={[0, 0, 0]}
                   enableDamping={true}
                   dampingFactor={0.05}
-                  maxPolarAngle={Math.PI / 1.5}
-                  minPolarAngle={Math.PI / 6}
-                  zoomSpeed={1.2}
-                  rotateSpeed={0.8}
-                  panSpeed={0.8}
-                  touches={{
-                    ONE: 1, // One finger for rotation
-                    TWO: 2 // Two fingers for zoom and pan
-                  }}
                 />
 
                 {/* AR Crosshair */}
