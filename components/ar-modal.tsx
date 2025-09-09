@@ -18,7 +18,7 @@ import * as THREE from 'three';
 function ARModelOverlay({
   url,
   position = [0, 0, 0],
-  scale = 1.5,
+  scale = 3.0,
   onModelReady,
   onModelLoading
 }: {
@@ -465,11 +465,14 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
                   enableZoom={true}
                   enablePan={true}
                   enableRotate={true}
-                  minDistance={2}
-                  maxDistance={10}
+                  minDistance={3}
+                  maxDistance={20}
                   target={[0, 0, 0]}
                   enableDamping={true}
                   dampingFactor={0.05}
+                  zoomSpeed={1.2}
+                  rotateSpeed={0.8}
+                  panSpeed={0.8}
                 />
 
                 {/* AR Crosshair */}
