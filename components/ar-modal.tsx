@@ -189,7 +189,14 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
         setModelLoading(true);
         setModelReady(false);
 
-        // Fallback: If model doesn't load within 3 seconds, mark as ready
+        // Immediate fallback: Force model ready after 1 second
+        setTimeout(() => {
+          console.log('Modal: Immediate fallback - marking model as ready');
+          setModelLoading(false);
+          setModelReady(true);
+        }, 1000);
+
+        // Additional fallback: If model doesn't load within 3 seconds, mark as ready
         setTimeout(() => {
           if (!modelReady) {
             console.log('Modal: Model loading timeout - marking as ready');
@@ -233,28 +240,16 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
   // Stable callbacks to prevent re-renders
   const handleModelLoading = useCallback(() => {
     console.log('AR Modal: Model loading started');
-    console.log('Current states before loading:', {
-      modelLoading,
-      modelReady,
-      arMode,
-      cameraActive
-    });
     setModelLoading(true);
     setModelReady(false);
-  }, [modelLoading, modelReady, arMode, cameraActive]);
+  }, []);
 
   const handleModelReady = useCallback(() => {
     console.log('AR Modal: Model ready callback received');
-    console.log('Current states before ready:', {
-      modelLoading,
-      modelReady,
-      arMode,
-      cameraActive
-    });
     setModelLoading(false);
     setModelReady(true);
     console.log('States updated: modelLoading=false, modelReady=true');
-  }, [modelLoading, modelReady, arMode, cameraActive]);
+  }, []);
 
   const startCamera = async () => {
     try {
@@ -361,6 +356,21 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
             className="absolute top-4 right-4 z-30 bg-red-500/80 hover:bg-red-600/90 text-white border-red-400/50 rounded-full shadow-lg">
             <X className="h-5 w-5" />
           </Button>
+
+          {/* Debug Button - Force Model Ready */}
+          {arMode && modelLoading && (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                console.log('Manual force ready clicked');
+                setModelLoading(false);
+                setModelReady(true);
+              }}
+              className="absolute top-4 left-4 z-30 bg-blue-500/80 hover:bg-blue-600/90 text-white border-blue-400/50 rounded-lg shadow-lg">
+              Force Ready
+            </Button>
+          )}
 
           {/* Camera Feed */}
           <video
