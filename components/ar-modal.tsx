@@ -11,8 +11,7 @@ import {
   useAnimations,
   OrbitControls,
   PerspectiveCamera,
-  Grid,
-  Environment
+  Grid
 } from '@react-three/drei';
 import * as THREE from 'three';
 
@@ -215,8 +214,23 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
   const [arInteractionMode, setArInteractionMode] = useState<
     'move' | 'rotate' | 'scale'
   >('move');
+  const [deviceOrientation, setDeviceOrientation] = useState({
+    alpha: 0,
+    beta: 0,
+    gamma: 0
+  });
+  const [deviceMotion, setDeviceMotion] = useState({ x: 0, y: 0, z: 0 });
+  const [sensorEnabled, setSensorEnabled] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const orientationRef = useRef<{ alpha: number; beta: number; gamma: number }>(
+    { alpha: 0, beta: 0, gamma: 0 }
+  );
+  const motionRef = useRef<{ x: number; y: number; z: number }>({
+    x: 0,
+    y: 0,
+    z: 0
+  });
 
   // Start camera when modal opens
   useEffect(() => {
@@ -299,6 +313,26 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
     }
   }, [arMode, modelLoading, modelReady]);
 
+  // Enable sensors when AR mode starts
+  useEffect(() => {
+    if (arMode && surfaceDetected) {
+      enableSensors();
+    } else {
+      disableSensors();
+    }
+
+    return () => {
+      disableSensors();
+    };
+  }, [arMode, surfaceDetected, enableSensors, disableSensors]);
+
+  // Clean up sensors when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      disableSensors();
+    }
+  }, [isOpen, disableSensors]);
+
   // Debug state changes
   useEffect(() => {
     console.log('AR Modal State Change:', {
@@ -333,6 +367,78 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
     },
     []
   );
+
+  // Device orientation handler
+  const handleOrientationChange = useCallback(
+    (event: DeviceOrientationEvent) => {
+      const { alpha, beta, gamma } = event;
+      orientationRef.current = {
+        alpha: alpha || 0,
+        beta: beta || 0,
+        gamma: gamma || 0
+      };
+      setDeviceOrientation({
+        alpha: alpha || 0,
+        beta: beta || 0,
+        gamma: gamma || 0
+      });
+    },
+    []
+  );
+
+  // Device motion handler
+  const handleMotionChange = useCallback((event: DeviceMotionEvent) => {
+    const { acceleration } = event;
+    if (acceleration) {
+      const { x, y, z } = acceleration;
+      motionRef.current = { x: x || 0, y: y || 0, z: z || 0 };
+      setDeviceMotion({ x: x || 0, y: y || 0, z: z || 0 });
+    }
+  }, []);
+
+  // Enable device sensors
+  const enableSensors = useCallback(async () => {
+    try {
+      // Request permission for device orientation
+      if (
+        typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof (DeviceOrientationEvent as any).requestPermission === 'function'
+      ) {
+        const permission = await (
+          DeviceOrientationEvent as any
+        ).requestPermission();
+        if (permission !== 'granted') {
+          console.log('Device orientation permission denied');
+          return;
+        }
+      }
+
+      // Add event listeners
+      window.addEventListener(
+        'deviceorientation',
+        handleOrientationChange,
+        true
+      );
+      window.addEventListener('devicemotion', handleMotionChange, true);
+
+      setSensorEnabled(true);
+      console.log('Device sensors enabled');
+    } catch (error) {
+      console.error('Error enabling sensors:', error);
+    }
+  }, [handleOrientationChange, handleMotionChange]);
+
+  // Disable device sensors
+  const disableSensors = useCallback(() => {
+    window.removeEventListener(
+      'deviceorientation',
+      handleOrientationChange,
+      true
+    );
+    window.removeEventListener('devicemotion', handleMotionChange, true);
+    setSensorEnabled(false);
+    console.log('Device sensors disabled');
+  }, [handleOrientationChange, handleMotionChange]);
 
   const startCamera = async () => {
     try {
@@ -564,19 +670,28 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
                 }}>
                 <PerspectiveCamera makeDefault position={[0, 0, 8]} fov={60} />
 
-                {/* AR Environment Setup */}
-                <Environment preset="sunset" />
+                {/* AR Environment Setup - Removed HDR loading to prevent errors */}
 
-                {/* Dynamic Lighting based on AR context */}
-                <ambientLight intensity={0.8} />
+                {/* AR-Optimized Lighting Setup */}
+                <ambientLight intensity={0.6} />
                 <directionalLight
                   position={[5, 10, 5]}
-                  intensity={1.5}
+                  intensity={1.2}
                   castShadow
                   shadow-mapSize={[1024, 1024]}
+                  shadow-camera-far={50}
+                  shadow-camera-left={-10}
+                  shadow-camera-right={10}
+                  shadow-camera-top={10}
+                  shadow-camera-bottom={-10}
                 />
-                <pointLight position={[0, 5, 5]} intensity={0.8} />
-                <hemisphereLight args={[0xffffff, 0x444444, 0.6]} />
+                <pointLight position={[0, 5, 5]} intensity={0.6} />
+                <pointLight
+                  position={[-5, 3, 2]}
+                  intensity={0.4}
+                  color="#ffaa00"
+                />
+                <hemisphereLight args={[0xffffff, 0x444444, 0.8]} />
 
                 {/* AR Surface Detection */}
                 <ARSurfaceDetection onSurfaceDetected={handleSurfaceDetected} />
