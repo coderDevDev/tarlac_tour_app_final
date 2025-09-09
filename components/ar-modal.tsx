@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Camera, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -203,6 +203,59 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
     }
   }, [cameraActive, arMode]);
 
+  // Additional fallback: Force model ready after 5 seconds if still loading
+  useEffect(() => {
+    if (arMode && modelLoading && !modelReady) {
+      const forceReadyTimer = setTimeout(() => {
+        console.log(
+          'Force ready: Model has been loading too long, forcing ready state'
+        );
+        setModelLoading(false);
+        setModelReady(true);
+      }, 5000);
+
+      return () => clearTimeout(forceReadyTimer);
+    }
+  }, [arMode, modelLoading, modelReady]);
+
+  // Debug state changes
+  useEffect(() => {
+    console.log('AR Modal State Change:', {
+      isInitializing,
+      cameraActive,
+      arMode,
+      modelLoading,
+      modelReady,
+      error
+    });
+  }, [isInitializing, cameraActive, arMode, modelLoading, modelReady, error]);
+
+  // Stable callbacks to prevent re-renders
+  const handleModelLoading = useCallback(() => {
+    console.log('AR Modal: Model loading started');
+    console.log('Current states before loading:', {
+      modelLoading,
+      modelReady,
+      arMode,
+      cameraActive
+    });
+    setModelLoading(true);
+    setModelReady(false);
+  }, [modelLoading, modelReady, arMode, cameraActive]);
+
+  const handleModelReady = useCallback(() => {
+    console.log('AR Modal: Model ready callback received');
+    console.log('Current states before ready:', {
+      modelLoading,
+      modelReady,
+      arMode,
+      cameraActive
+    });
+    setModelLoading(false);
+    setModelReady(true);
+    console.log('States updated: modelLoading=false, modelReady=true');
+  }, [modelLoading, modelReady, arMode, cameraActive]);
+
   const startCamera = async () => {
     try {
       console.log('Starting camera for AR modal...');
@@ -395,16 +448,8 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
                   url={site.modelUrl || '/models/placeholder.glb'}
                   position={[0, 0, 0]}
                   scale={1.5}
-                  onModelLoading={() => {
-                    console.log('AR Modal: Model loading started');
-                    setModelLoading(true);
-                    setModelReady(false);
-                  }}
-                  onModelReady={() => {
-                    console.log('AR Modal: Model ready callback received');
-                    setModelLoading(false);
-                    setModelReady(true);
-                  }}
+                  onModelLoading={handleModelLoading}
+                  onModelReady={handleModelReady}
                 />
 
                 {/* OrbitControls for touch interaction */}
@@ -467,7 +512,7 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
                     <p className="text-xs text-gray-300">
                       {modelReady
                         ? 'AR Mode Active - Touch to interact with 3D model'
-                        : 'Loading 3D model...'}
+                        : `Loading 3D model... (Loading: ${modelLoading}, Ready: ${modelReady}, AR: ${arMode}, Camera: ${cameraActive})`}
                     </p>
                   </div>
                 </div>
