@@ -416,9 +416,7 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
                 <div className="absolute inset-0 bg-black/70 z-30 flex items-center justify-center">
                   <div className="text-center text-white">
                     <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
-                    <h3 className="text-lg font-semibold mb-2">
-                      Loading 3D Model
-                    </h3>
+                    <h3 className="text-lg font-semibold mb-2">Loading</h3>
                     <p className="text-sm text-gray-300 max-w-xs">
                       Preparing {site.name} for AR experience...
                     </p>
@@ -512,8 +510,8 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
                     </h3>
                     <p className="text-xs text-gray-300">
                       {modelReady
-                        ? 'AR Mode Active - Touch to interact with 3D model'
-                        : `Loading 3D model... (Loading: ${modelLoading}, Ready: ${modelReady}, AR: ${arMode}, Camera: ${cameraActive})`}
+                        ? 'AR Mode Active - Touch to interact'
+                        : `Loading ... (Loading: ${modelLoading}, Ready: ${modelReady}, AR: ${arMode}, Camera: ${cameraActive})`}
                     </p>
                   </div>
                 </div>
