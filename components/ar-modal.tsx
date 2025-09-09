@@ -41,17 +41,25 @@ function ARModelOverlay({
   }, [url, onModelLoading]);
 
   useEffect(() => {
-    if (scene && scene.children && scene.children.length > 0) {
-      console.log(
-        'AR Modal: Model scene loaded, children count:',
-        scene.children.length
-      );
+    if (scene) {
+      console.log('AR Modal: Scene loaded, checking children...');
+      console.log('Scene children count:', scene.children.length);
 
+      // Check if scene has content or if it's a valid scene
+      if (scene.children && scene.children.length > 0) {
+        console.log('AR Modal: Model scene loaded with children');
+      } else {
+        console.log(
+          'AR Modal: Scene loaded but no children - might be placeholder'
+        );
+      }
+
+      // Mark as loaded regardless of children count (for placeholder models)
       const timer = setTimeout(() => {
         setModelLoaded(true);
         onModelReady?.();
         console.log('AR Modal: Model ready callback triggered');
-      }, 300); // Reduced delay for faster response
+      }, 200); // Even faster response
 
       return () => clearTimeout(timer);
     }
@@ -146,6 +154,10 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
       setModelReady(false);
       setError(null);
 
+      // Prevent page zoom and scrolling when modal is open
+      document.body.style.overflow = 'hidden';
+      document.body.style.touchAction = 'none';
+
       // Start camera after a small delay to ensure modal is fully rendered
       const timer = setTimeout(() => {
         startCamera();
@@ -160,6 +172,10 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
       setModelLoading(false);
       setModelReady(false);
       setError(null);
+
+      // Restore page scrolling and zoom
+      document.body.style.overflow = 'auto';
+      document.body.style.touchAction = 'auto';
     }
   }, [isOpen]);
 
@@ -172,7 +188,16 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
         setArMode(true);
         setModelLoading(true);
         setModelReady(false);
-      }, 1500); // Reduced delay for smoother experience
+
+        // Fallback: If model doesn't load within 3 seconds, mark as ready
+        setTimeout(() => {
+          if (!modelReady) {
+            console.log('Modal: Model loading timeout - marking as ready');
+            setModelLoading(false);
+            setModelReady(true);
+          }
+        }, 3000);
+      }, 1000); // Reduced delay for faster response
 
       return () => clearTimeout(timer);
     }
@@ -343,13 +368,19 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
                   width: '100%',
                   height: '100%',
                   touchAction: 'none',
-                  userSelect: 'none'
+                  userSelect: 'none',
+                  position: 'relative',
+                  zIndex: 1
                 }}
                 camera={{ position: [0, 0, 8], fov: 60 }}
                 gl={{
                   alpha: true,
                   antialias: true,
                   preserveDrawingBuffer: true
+                }}
+                onPointerMissed={() => {
+                  // Prevent page zoom when clicking on canvas
+                  document.body.style.overflow = 'hidden';
                 }}>
                 <PerspectiveCamera makeDefault position={[0, 0, 8]} fov={60} />
 
@@ -381,13 +412,20 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
                   enableZoom={true}
                   enablePan={true}
                   enableRotate={true}
-                  minDistance={3}
-                  maxDistance={15}
+                  minDistance={1}
+                  maxDistance={20}
                   target={[0, 0, 0]}
                   enableDamping={true}
                   dampingFactor={0.05}
                   maxPolarAngle={Math.PI / 1.5}
                   minPolarAngle={Math.PI / 6}
+                  zoomSpeed={1.2}
+                  rotateSpeed={0.8}
+                  panSpeed={0.8}
+                  touches={{
+                    ONE: 1, // One finger for rotation
+                    TWO: 2 // Two fingers for zoom and pan
+                  }}
                 />
 
                 {/* AR Crosshair */}
