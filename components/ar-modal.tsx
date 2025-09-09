@@ -15,6 +15,59 @@ import {
 } from '@react-three/drei';
 import * as THREE from 'three';
 
+// AR Camera Component that responds to device sensors
+function ARCamera({
+  deviceOrientation,
+  deviceMotion,
+  surfacePosition
+}: {
+  deviceOrientation: { alpha: number; beta: number; gamma: number };
+  deviceMotion: { x: number; y: number; z: number };
+  surfacePosition: [number, number, number];
+}) {
+  const cameraRef = useRef<THREE.PerspectiveCamera>(null);
+
+  useFrame(() => {
+    if (cameraRef.current) {
+      // Convert device orientation to camera rotation
+      const alpha = (deviceOrientation.alpha * Math.PI) / 180; // Z axis rotation
+      const beta = (deviceOrientation.beta * Math.PI) / 180; // X axis rotation
+      const gamma = (deviceOrientation.gamma * Math.PI) / 180; // Y axis rotation
+
+      // Apply device motion to camera position
+      const motionX = deviceMotion.x * 0.1; // Scale down motion
+      const motionY = deviceMotion.y * 0.1;
+      const motionZ = deviceMotion.z * 0.1;
+
+      // Update camera position based on device motion
+      cameraRef.current.position.x = motionX;
+      cameraRef.current.position.y = motionY + 2; // Keep camera above ground
+      cameraRef.current.position.z = motionZ + 8;
+
+      // Update camera rotation based on device orientation
+      cameraRef.current.rotation.x = beta;
+      cameraRef.current.rotation.y = alpha;
+      cameraRef.current.rotation.z = gamma;
+
+      // Look at the surface position
+      cameraRef.current.lookAt(
+        surfacePosition[0],
+        surfacePosition[1],
+        surfacePosition[2]
+      );
+    }
+  });
+
+  return (
+    <PerspectiveCamera
+      ref={cameraRef}
+      makeDefault
+      position={[0, 2, 8]}
+      fov={60}
+    />
+  );
+}
+
 // AR Surface Detection Component
 function ARSurfaceDetection({
   onSurfaceDetected
@@ -324,14 +377,14 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
     return () => {
       disableSensors();
     };
-  }, [arMode, surfaceDetected, enableSensors, disableSensors]);
+  }, [arMode, surfaceDetected]);
 
   // Clean up sensors when modal closes
   useEffect(() => {
     if (!isOpen) {
       disableSensors();
     }
-  }, [isOpen, disableSensors]);
+  }, [isOpen]);
 
   // Debug state changes
   useEffect(() => {
@@ -580,6 +633,17 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
             </div>
           )}
 
+          {/* Sensor Control Button */}
+          {arMode && surfaceDetected && (
+            <Button
+              size="sm"
+              variant={sensorEnabled ? 'default' : 'secondary'}
+              onClick={sensorEnabled ? disableSensors : enableSensors}
+              className="absolute top-16 left-4 z-30 bg-purple-500/80 hover:bg-purple-600/90 text-white border-purple-400/50 rounded-lg shadow-lg">
+              {sensorEnabled ? 'Disable Sensors' : 'Enable Sensors'}
+            </Button>
+          )}
+
           {/* Debug Button - Force Model Ready */}
           {arMode && modelLoading && (
             <Button
@@ -590,7 +654,7 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
                 setModelLoading(false);
                 setModelReady(true);
               }}
-              className="absolute top-16 left-4 z-30 bg-blue-500/80 hover:bg-blue-600/90 text-white border-blue-400/50 rounded-lg shadow-lg">
+              className="absolute top-28 left-4 z-30 bg-blue-500/80 hover:bg-blue-600/90 text-white border-blue-400/50 rounded-lg shadow-lg">
               Force Ready
             </Button>
           )}
@@ -668,7 +732,12 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
                   // Prevent page zoom when clicking on canvas
                   document.body.style.overflow = 'hidden';
                 }}>
-                <PerspectiveCamera makeDefault position={[0, 0, 8]} fov={60} />
+                {/* AR Camera with device sensor integration */}
+                <ARCamera
+                  deviceOrientation={deviceOrientation}
+                  deviceMotion={deviceMotion}
+                  surfacePosition={surfacePosition}
+                />
 
                 {/* AR Environment Setup - Removed HDR loading to prevent errors */}
 
@@ -794,6 +863,9 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
                   </div>
                   <div className="text-xs text-gray-400">
                     {modelReady ? '✓ Model' : '⏳ Model'}
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    {sensorEnabled ? '✓ Sensors' : '⏳ Sensors'}
                   </div>
                 </div>
               </div>
