@@ -435,7 +435,7 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
                   position: 'relative',
                   zIndex: 1
                 }}
-                camera={{ position: [0, 0, 5], fov: 75 }}
+                camera={{ position: [0, 0, 8], fov: 60 }}
                 gl={{
                   alpha: true,
                   antialias: true,
