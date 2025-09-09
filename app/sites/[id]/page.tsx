@@ -254,7 +254,7 @@ export default function SitePage() {
       </Tabs>
 
       {/* AR Modal */}
-      {site && (
+      {/* {site && (
         <ARModal
           isOpen={showARModal}
           onClose={closeARModal}
@@ -264,7 +264,7 @@ export default function SitePage() {
             modelUrl: site.modelUrl
           }}
         />
-      )}
+      )} */}
     </div>
   );
 }
