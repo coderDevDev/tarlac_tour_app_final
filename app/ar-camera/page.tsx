@@ -1185,7 +1185,7 @@ export default function ARCameraPage() {
         )}
 
         {/* Bottom Camera Control - Always visible when site is loaded */}
-        {currentSite && (
+        {/* {currentSite && (
           <div className="absolute bottom-4 left-4 right-4 z-30">
             <div className="bg-black/80 backdrop-blur-md rounded-xl p-4 text-center border border-white/20">
               <div className="flex items-center justify-center gap-3 mb-3">
@@ -1236,7 +1236,7 @@ export default function ARCameraPage() {
               )}
             </div>
           </div>
-        )}
+        )} */}
 
         {/* Loading indicator */}
         {isLoading && (

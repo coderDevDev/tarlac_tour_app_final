@@ -51,11 +51,24 @@ function ARModelOverlay({
         setModelLoaded(true);
         onModelReady?.();
         console.log('AR Modal: Model ready callback triggered');
-      }, 500);
+      }, 300); // Reduced delay for faster response
 
       return () => clearTimeout(timer);
     }
   }, [scene, onModelReady]);
+
+  // Fallback: If model doesn't load within 5 seconds, mark as ready
+  useEffect(() => {
+    const fallbackTimer = setTimeout(() => {
+      if (!modelLoaded) {
+        console.log('AR Modal: Model loading timeout - marking as ready');
+        setModelLoaded(true);
+        onModelReady?.();
+      }
+    }, 5000); // 5 second timeout
+
+    return () => clearTimeout(fallbackTimer);
+  }, [modelLoaded, onModelReady]);
 
   useEffect(() => {
     if (animations.length > 0 && actions && modelLoaded) {
@@ -119,18 +132,34 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
   const [modelLoading, setModelLoading] = useState(false);
   const [modelReady, setModelReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isInitializing, setIsInitializing] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   // Start camera when modal opens
   useEffect(() => {
     if (isOpen) {
-      startCamera();
-    } else {
-      stopCamera();
+      // Reset all states when modal opens
+      setIsInitializing(true);
       setArMode(false);
       setModelLoading(false);
       setModelReady(false);
+      setError(null);
+
+      // Start camera after a small delay to ensure modal is fully rendered
+      const timer = setTimeout(() => {
+        startCamera();
+      }, 100);
+
+      return () => clearTimeout(timer);
+    } else {
+      // Clean up when modal closes
+      stopCamera();
+      setIsInitializing(false);
+      setArMode(false);
+      setModelLoading(false);
+      setModelReady(false);
+      setError(null);
     }
   }, [isOpen]);
 
@@ -139,10 +168,11 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
     if (cameraActive && !arMode) {
       const timer = setTimeout(() => {
         console.log('Auto-enabling AR mode in modal');
+        setIsInitializing(false);
         setArMode(true);
         setModelLoading(true);
         setModelReady(false);
-      }, 2000);
+      }, 1500); // Reduced delay for smoother experience
 
       return () => clearTimeout(timer);
     }
@@ -157,8 +187,10 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
         throw new Error('Camera not supported in this browser');
       }
 
+      // Clean up existing stream
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -173,7 +205,13 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
       streamRef.current = stream;
 
       if (videoRef.current) {
+        // Clear previous source
+        videoRef.current.srcObject = null;
+
+        // Set new source
         videoRef.current.srcObject = stream;
+
+        // Wait for metadata to load
         videoRef.current.onloadedmetadata = () => {
           if (videoRef.current) {
             videoRef.current
@@ -188,6 +226,9 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
               });
           }
         };
+      } else {
+        console.error('Video element not found');
+        setError('Video element not available');
       }
     } catch (err: any) {
       console.error('Error starting camera:', err);
@@ -225,20 +266,22 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
+        className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+        onClick={onClose}>
         {/* Modal Content */}
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.9, opacity: 0 }}
-          className="relative w-full max-w-4xl h-[80vh] bg-black rounded-2xl overflow-hidden">
+          className="relative w-full max-w-4xl h-[80vh] bg-black rounded-2xl overflow-hidden"
+          onClick={e => e.stopPropagation()}>
           {/* Close Button */}
           <Button
             size="icon"
             variant="secondary"
             onClick={onClose}
-            className="absolute top-4 right-4 z-30 bg-black/50 hover:bg-black/70 text-white border-white/30 rounded-full">
-            <X className="h-4 w-4" />
+            className="absolute top-4 right-4 z-30 bg-red-500/80 hover:bg-red-600/90 text-white border-red-400/50 rounded-full shadow-lg">
+            <X className="h-5 w-5" />
           </Button>
 
           {/* Camera Feed */}
@@ -260,16 +303,18 @@ export default function ARModal({ isOpen, onClose, site }: ARModalProps) {
             }}
           />
 
-          {/* Camera Not Active Overlay */}
-          {!cameraActive && (
+          {/* Initialization Overlay */}
+          {(isInitializing || !cameraActive) && (
             <div className="absolute inset-0 z-20 bg-black/50 flex items-center justify-center">
               <div className="text-center text-white p-6">
-                <Camera className="h-16 w-16 mx-auto mb-4 text-white/70" />
+                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
                 <h3 className="text-lg font-semibold mb-2">
-                  Starting Camera...
+                  {isInitializing ? 'Initializing AR...' : 'Starting Camera...'}
                 </h3>
                 <p className="text-sm text-gray-300">
-                  Please allow camera access for AR experience
+                  {isInitializing
+                    ? 'Setting up AR experience...'
+                    : 'Please allow camera access for AR experience'}
                 </p>
               </div>
             </div>
