@@ -44,7 +44,7 @@ declare global {
 function ARModelOverlay({
   url,
   position = [0, 0, 0],
-  scale = 1.5,
+  scale = 3.0,
   onModelReady,
   onModelLoading
 }: {
@@ -876,8 +876,7 @@ export default function ARCameraPage() {
 
         <div className="mt-4 text-sm text-muted-foreground text-center">
           <p>
-            Move your device around to explore the 3D model. Use touch gestures
-            to interact.
+            Move your device around to explore. Use touch gestures to interact.
           </p>
         </div>
       </div>
@@ -945,9 +944,7 @@ export default function ARCameraPage() {
               <div className="absolute inset-0 bg-black/70 z-30 flex items-center justify-center">
                 <div className="text-center text-white">
                   <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
-                  <h3 className="text-lg font-semibold mb-2">
-                    Loading 3D Model
-                  </h3>
+                  <h3 className="text-lg font-semibold mb-2">Loading ...</h3>
                   <p className="text-sm text-gray-300 max-w-xs">
                     Preparing {currentSite.name} for AR experience...
                   </p>
@@ -984,7 +981,7 @@ export default function ARCameraPage() {
               <ARModelOverlay
                 url={currentSite.modelUrl || '/models/placeholder.glb'}
                 position={[0, 0, 0]}
-                scale={1.5}
+                scale={3.0}
                 onModelLoading={() => setModelLoading(true)}
                 onModelReady={() => {
                   setModelLoading(false);
@@ -1053,7 +1050,7 @@ export default function ARCameraPage() {
                   </h3>
                   <p className="text-xs text-gray-300">
                     {modelReady
-                      ? 'AR Mode Active - Touch to interact with 3D model'
+                      ? 'AR Mode Active - Touch to interact'
                       : 'Loading ...'}
                   </p>
                 </div>
@@ -1119,9 +1116,7 @@ export default function ARCameraPage() {
             <div className="bg-blue-500/90 backdrop-blur-md rounded-xl p-4 text-center border border-blue-400/30">
               <div className="flex items-center justify-center gap-3 mb-2">
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                <span className="text-sm font-medium text-white">
-                  Loading
-                </span>
+                <span className="text-sm font-medium text-white">Loading</span>
               </div>
               <p className="text-xs text-blue-100">
                 Please wait while we prepare {currentSite.name} for AR
@@ -1276,7 +1271,7 @@ export default function ARCameraPage() {
                   <CardDescription>
                     {siteId && site
                       ? `Starting camera for ${site.name}. AR experience will load after camera is ready.`
-                      : 'Scan QR codes at heritage sites to view 3D models overlaid on the real world.'}
+                      : 'Scan QR codes at heritage sites to view overlaid on the real world.'}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col items-center space-y-6">
@@ -1291,7 +1286,7 @@ export default function ARCameraPage() {
                           <RefreshCw className="h-4 w-4 animate-spin" />
                           <span>
                             {cameraActive
-                              ? 'Loading 3D Model...'
+                              ? 'Loading ...'
                               : 'Starting Camera...'}
                           </span>
                         </div>
